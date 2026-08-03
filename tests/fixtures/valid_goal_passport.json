@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "chain": {
+    "chainId": "HRE-001",
+    "projectRoot": "D:\\repo",
+    "dataOwner": "team",
+    "riskClass": "medium",
+    "externalSideEffectBoundary": "local only",
+    "parentOutcome": "validate",
+    "status": "running",
+    "planRevision": 1,
+    "approvedPassportRevision": 1,
+    "approvalProvenance": "task",
+    "checkoutWorktreePolicy": "isolated",
+    "globalAgentCap": 2,
+    "delegationDepthCap": 1,
+    "standingChainAuthorization": "approved",
+    "standingAuthorizationScope": "both",
+    "currentVerifiedSubgoal": "G01",
+    "nextMinimalSliceAcceptance": "test"
+  },
+  "subgoals": [
+    {
+      "id": "G01",
+      "dependsOn": [],
+      "wave": 1,
+      "status": "done",
+      "execution": "primary",
+      "model": "terra",
+      "worktree": null,
+      "ownedPaths": []
+    },
+    {
+      "id": "G02",
+      "dependsOn": ["G01"],
+      "wave": 2,
+      "status": "ready",
+      "execution": "subagent",
+      "model": "terra",
+      "worktree": "g02",
+      "ownedPaths": ["x.py"]
+    }
+  ],
+  "agents": [
+    {
+      "id": "a1",
+      "subgoalId": "G02",
+      "role": "worker",
+      "depth": 1,
+      "worktree": "g02",
+      "ownedPaths": ["x.py"],
+      "status": "active",
+      "writer": true
+    }
+  ]
+}
