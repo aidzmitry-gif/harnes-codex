@@ -40,7 +40,7 @@ class HarnessMetricsTests(unittest.TestCase):
             metrics.validate_event(event(pairKey="pair\n2"))
 
     def test_append_and_summary(self):
-        with tempfile.TemporaryDirectory(dir=Path.cwd() / "tests") as directory:
+        with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "metrics.jsonl"
             metrics.append_record(path, metrics.normalize_event(event(), "2026-08-03T00:00:00Z"))
             metrics.append_record(path, metrics.normalize_event(event(runId="run-2", inputTokens=3, outputTokens=5, released=True, used=True), "2026-08-03T00:01:00Z"))
@@ -63,7 +63,7 @@ class HarnessMetricsTests(unittest.TestCase):
         self.assertEqual(result["deltas"]["accepted"]["mean"], -1.0)
 
     def test_cli_rejects_malformed_jsonl(self):
-        with tempfile.TemporaryDirectory(dir=Path.cwd() / "tests") as directory:
+        with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "bad.jsonl"
             path.write_text("not-json\n", encoding="utf-8")
             completed = subprocess.run([sys.executable, "harness_metrics.py", "summary", "--file", str(path)], capture_output=True, text=True)
