@@ -1,0 +1,95 @@
+{
+  "criteria": [
+    {
+      "id": "runtime-tests",
+      "kind": "command",
+      "description": "Local tests cover telemetry, acceptance freshness, executable-plan validation and benchmark contracts.",
+      "command": "python -m unittest discover -s tests -v",
+      "checkedAt": "2026-08-03T21:54:51.265358+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "f83ce0becf7125153651355ab0f11fe566dff4df6f6b1c77081e7c3f50472ad0",
+        "status": "ok"
+      },
+      "passes": true,
+      "evidence": "auto: exit 0; PASS recorded evidence for manual",
+      "durationMs": 3719
+    },
+    {
+      "id": "plan-passport",
+      "kind": "command",
+      "description": "The actual owner-maintained HRE-001 executable passport is valid at the final verified boundary.",
+      "command": "python goal_runner_validator.py check .harness/work/hre-001.passport.json",
+      "checkedAt": "2026-08-03T21:54:54.981983+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "f83ce0becf7125153651355ab0f11fe566dff4df6f6b1c77081e7c3f50472ad0",
+        "status": "ok"
+      },
+      "passes": true,
+      "evidence": "auto: exit 0; PASS goal passport is valid",
+      "durationMs": 359
+    },
+    {
+      "id": "benchmark",
+      "kind": "command",
+      "description": "The deterministic benchmark remains a regression oracle, not evidence of production token savings.",
+      "command": "python harness_benchmark.py --fixture tests/fixtures/hre-001-benchmark.json",
+      "checkedAt": "2026-08-03T21:54:55.341570+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "f83ce0becf7125153651355ab0f11fe566dff4df6f6b1c77081e7c3f50472ad0",
+        "status": "ok"
+      },
+      "passes": true,
+      "evidence": "auto: exit 0; {\"comparison\":{\"baseline\":\"baseline\",\"deltas\":{\"accepted\":{\"mean\":0.8,\"pairs\":20},\"defects\":{\"mean\":-0.8,\"pairs\":20},\"durationMs\":{\"mean\":0.0,\"pairs\":20},\"known",
+      "durationMs": 422
+    },
+    {
+      "id": "architecture",
+      "kind": "command",
+      "description": "Goal Runner workflow, handoff continuity and local architecture invariants are consistent.",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-GoalRunnerArchitecture.ps1",
+      "checkedAt": "2026-08-03T21:54:55.764175+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "f83ce0becf7125153651355ab0f11fe566dff4df6f6b1c77081e7c3f50472ad0",
+        "status": "ok"
+      },
+      "passes": true,
+      "evidence": "auto: exit 0; PASS Goal Runner architecture contract is internally consistent.",
+      "durationMs": 1063
+    },
+    {
+      "id": "installer",
+      "kind": "command",
+      "description": "Manifest installation remains idempotent, bounded, rollback-safe and uninstallable.",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-GoalRunnerInstaller.ps1",
+      "checkedAt": "2026-08-03T21:54:56.830848+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "f83ce0becf7125153651355ab0f11fe566dff4df6f6b1c77081e7c3f50472ad0",
+        "status": "ok"
+      },
+      "passes": true,
+      "evidence": "auto: exit 0; PASS Goal Runner installer is idempotent, rejects unmanaged paths, rolls back safely, and uninstalls cleanly.",
+      "durationMs": 12687
+    },
+    {
+      "id": "review",
+      "kind": "manual",
+      "description": "Fresh correctness, security and simplify review confirms scope, compatibility, rollback and sole-writer ownership.",
+      "evidence": "Reviewed final G07 state diff for correctness, security, rollback, scope, and sole-writer ownership; simplify review found no lower sufficient rung.",
+      "passes": true,
+      "checkedAt": "2026-08-03T21:54:50.530484+00:00",
+      "durationMs": 0,
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "f83ce0becf7125153651355ab0f11fe566dff4df6f6b1c77081e7c3f50472ad0",
+        "status": "ok"
+      }
+    }
+  ],
+  "workItem": "hre-001",
+  "schemaVersion": 2
+}

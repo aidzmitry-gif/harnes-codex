@@ -6,7 +6,14 @@
       "description": "Goal Runner skill, agent roles, TOML cap and handoff invariants are consistent.",
       "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-GoalRunnerArchitecture.ps1",
       "passes": true,
-      "evidence": "auto: exit 0; PASS Goal Runner architecture contract is internally consistent."
+      "evidence": "auto: exit 0; PASS Goal Runner architecture contract is internally consistent.",
+      "checkedAt": "2026-08-03T21:55:09.892725+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "f83ce0becf7125153651355ab0f11fe566dff4df6f6b1c77081e7c3f50472ad0",
+        "status": "ok"
+      },
+      "durationMs": 1047
     },
     {
       "id": "installer",
@@ -14,15 +21,30 @@
       "description": "Manifest-backed installation is byte-idempotent, rejects unmanaged paths, rolls back safely and uninstalls cleanly across source version drift.",
       "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-GoalRunnerInstaller.ps1",
       "passes": true,
-      "evidence": "auto: exit 0; PASS Goal Runner installer is idempotent, rejects unmanaged paths, rolls back safely, and uninstalls cleanly."
+      "evidence": "auto: exit 0; PASS Goal Runner installer is idempotent, rejects unmanaged paths, rolls back safely, and uninstalls cleanly.",
+      "checkedAt": "2026-08-03T21:55:10.932125+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "f83ce0becf7125153651355ab0f11fe566dff4df6f6b1c77081e7c3f50472ad0",
+        "status": "ok"
+      },
+      "durationMs": 12766
     },
     {
       "id": "review",
       "kind": "manual",
       "description": "Explicit file review confirms scope, compatibility, security, rollback and no concurrent writer violation.",
-      "evidence": "Laziness ladder integration reviewed independently: P0/High none. Six canonical rungs, safety floor, ponytail trigger, task packet/state evidence, and ordered correctness-then-simplify review verified by two forward tests.",
-      "passes": true
+      "evidence": "Fresh architecture review confirmed Goal Runner contracts, bounded authorization, path safety, rollback, and single-writer invariants; simplify review retained the stdlib design.",
+      "passes": true,
+      "checkedAt": "2026-08-03T21:54:50.893494+00:00",
+      "durationMs": 0,
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "f83ce0becf7125153651355ab0f11fe566dff4df6f6b1c77081e7c3f50472ad0",
+        "status": "ok"
+      }
     }
   ],
-  "workItem": "goal-runner-architecture"
+  "workItem": "goal-runner-architecture",
+  "schemaVersion": 2
 }
