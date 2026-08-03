@@ -111,6 +111,7 @@ Use this mode only when all of the following are recorded in the active parent w
 - the user's approval of the Goal passport;
 - `standing chain authorization: approved` and `Standing authorization scope: successor creation | bounded continuation | both`;
 - an `Approved passport revision` equal to the current `Plan revision`, plus exact approval provenance;
+- a validator-readable executable plan snapshot linked from the work item, last validation/hash, and the current verified boundary;
 - deferred archive policy requiring a final explicit chain command;
 - the current verified subgoal and next minimal slice with its acceptance check;
 - project root, data owner, risk class, external-side-effect boundary, and checkout/worktree policy.
@@ -118,6 +119,8 @@ Use this mode only when all of the following are recorded in the active parent w
 The authorization is invalid if any required field is absent or ambiguous; the approved and current plan revisions differ; approval provenance cannot be traced; or the project, parent outcome, data owner, risk class, external side effect, acceptance, or checkout ownership changes. Fall back to the normal confirmation workflow.
 
 Number successors `<CHAIN> · HNN · <next result>`. Create one automatically only when scope is `successor creation` or `both`. Keep the source quiescent after snapshot capture and verify the successor once. Let the primary orchestrator send the next implementation instruction automatically only when scope is `bounded continuation` or `both`; with creation-only scope, stop after verification and ask. Revalidate the complete authorization contract at both boundaries. Never archive a Goal chain during handoff. After the parent result passes its acceptance checks and the user explicitly says to archive that chain ID, archive registered tasks and never delete them.
+
+For a Goal-chain handoff, the marked snapshot may carry only measurement continuity: treatment ID, metrics path/schema, the last validated executable plan snapshot and hash (or equivalent), and the current verified boundary. The successor must run `python goal_runner_validator.py check <snapshot>` before continuing. Do not copy telemetry rows, chat/transcript, raw logs, or inferred token counts; runtime token values remain actual values or `null`.
 
 ## Completion report
 

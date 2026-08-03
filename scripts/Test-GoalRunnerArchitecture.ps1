@@ -12,6 +12,8 @@ $reminder = Join-Path $root '.agents\skills\context-handoff\scripts\context_hand
 $installer = Join-Path $root 'scripts\Install-GoalRunner.ps1'
 $uninstaller = Join-Path $root 'scripts\Uninstall-GoalRunner.ps1'
 $acceptanceTemplate = Join-Path $root 'templates\acceptance.goal-runner.json'
+$passport = Join-Path $root 'templates\goal-passport.example.json'
+$benchmarkFixture = Join-Path $root 'tests\fixtures\hre-001-benchmark.json'
 $configFixture = Join-Path $root 'templates\codex.config.fixture.toml'
 
 $pythonCheck = @'
@@ -39,16 +41,22 @@ assert roles['harness_goal_worker']['sandbox_mode'] == 'workspace-write'
 fixture = tomllib.loads((root / 'templates/codex.config.fixture.toml').read_text(encoding='utf-8'))
 assert fixture.get('features', {}).get('goals') is True
 criteria = json.loads((root / 'templates/acceptance.goal-runner.json').read_text(encoding='utf-8'))['criteria']
-assert [item['id'] for item in criteria] == ['architecture', 'installer', 'review']
+assert [item['id'] for item in criteria] == ['runtime-tests', 'plan-passport', 'benchmark', 'architecture', 'installer', 'review']
 print(json.dumps({'cap': agents['max_concurrent_threads_per_session'], 'roles': sorted(roles)}))
 '@
 
 & python -c $pythonCheck $root
 if ($LASTEXITCODE -ne 0) { throw 'TOML and acceptance architecture validation failed.' }
 
-foreach ($path in @($config, $skill, $goalState, $ladder, $handoff, $reminder, $installer, $uninstaller, $acceptanceTemplate, $configFixture)) {
+foreach ($path in @($config, $skill, $goalState, $ladder, $handoff, $reminder, $installer, $uninstaller, $acceptanceTemplate, $passport, $benchmarkFixture, $configFixture)) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing required file: $path" }
 }
+
+& python (Join-Path $root 'goal_runner_validator.py') check $passport
+if ($LASTEXITCODE -ne 0) { throw 'Example executable Goal passport is invalid.' }
+
+& python (Join-Path $root 'harness_benchmark.py') --fixture $benchmarkFixture
+if ($LASTEXITCODE -ne 0) { throw 'Deterministic Harness benchmark failed.' }
 
 $skillText = Get-Content -LiteralPath $skill -Raw
 $goalStateText = Get-Content -LiteralPath $goalState -Raw
@@ -69,7 +77,14 @@ $requiredSkillPatterns = @(
     'primary dispatches all workspace-write workers',
     'first sufficient laziness-ladder rung',
     'correctness review',
-    'separate simplify review'
+    'separate simplify review',
+    'executable plan snapshot',
+    'Before any measured execution, assign explicit bounded baseline and treatment IDs',
+    'Immediately before any worker write, validate the current executable plan snapshot',
+    'At meaningful run or accepted-subgoal checkpoints only',
+    'It does not prove real-world token savings or statistical significance',
+    'Acceptance evidence is fresh only for the current relevant repository state',
+    'carry only the treatment ID, metrics path/schema'
 )
 foreach ($pattern in $requiredSkillPatterns) {
     if (-not $skillText.Contains($pattern)) { throw "Goal Runner contract missing: $pattern" }
@@ -91,7 +106,11 @@ $requiredStatePatterns = @(
     'Last accepted commit:',
     'Current laziness-ladder rung:',
     'Rejected lower rungs:',
-    'Retained exceptions / ponytail triggers:'
+    'Retained exceptions / ponytail triggers:',
+    'Executable plan snapshot:',
+    'Last validated plan snapshot/hash:',
+    'Measurement treatment IDs:',
+    'Metrics path/schema:'
 )
 foreach ($pattern in $requiredStatePatterns) {
     if (-not $goalStateText.Contains($pattern)) { throw "Goal state schema missing: $pattern" }
@@ -126,7 +145,10 @@ $requiredHandoffPatterns = @(
     'Goal-chain mode',
     'standing chain authorization',
     'idle-pending-review',
-    'Never archive a Goal chain'
+    'Never archive a Goal chain',
+    'validator-readable executable plan snapshot',
+    'the last validated executable plan snapshot and hash',
+    'Do not copy telemetry rows'
 )
 foreach ($pattern in $requiredHandoffPatterns) {
     if (-not $handoffText.Contains($pattern)) { throw "Context Handoff chain contract missing: $pattern" }

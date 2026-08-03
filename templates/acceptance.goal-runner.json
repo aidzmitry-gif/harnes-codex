@@ -1,9 +1,27 @@
 {
   "criteria": [
     {
+      "id": "runtime-tests",
+      "kind": "command",
+      "description": "Local unit tests cover telemetry, acceptance freshness, executable-plan validation and benchmark contracts.",
+      "command": "python -m unittest discover -s tests -v"
+    },
+    {
+      "id": "plan-passport",
+      "kind": "command",
+      "description": "The owner-maintained executable Goal passport is valid before work begins.",
+      "command": "python goal_runner_validator.py check templates/goal-passport.example.json"
+    },
+    {
+      "id": "benchmark",
+      "kind": "command",
+      "description": "The checked deterministic benchmark remains a regression oracle; it is not proof of production token savings.",
+      "command": "python harness_benchmark.py --fixture tests/fixtures/hre-001-benchmark.json"
+    },
+    {
       "id": "architecture",
       "kind": "command",
-      "description": "Goal Runner skill, agent roles, TOML cap and handoff invariants are consistent.",
+      "description": "Goal Runner workflow, handoff continuity and local architecture invariants are consistent.",
       "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-GoalRunnerArchitecture.ps1"
     },
     {
@@ -15,7 +33,7 @@
     {
       "id": "review",
       "kind": "manual",
-      "description": "Explicit file review confirms scope, compatibility, security, rollback and no concurrent writer violation.",
+      "description": "Explicit fresh file review confirms scope, compatibility, security, rollback and no concurrent writer violation; re-prove after relevant repository changes.",
       "evidence": ""
     }
   ]

@@ -23,11 +23,13 @@ Run one large outcome through a verified DAG of subgoals while keeping the main 
 4. Record the observable parent outcome, exclusions, invariants, acceptance checks, risk, rollback, and approval boundaries.
 5. Read [goal-state.md](references/goal-state.md) when creating or resuming Goal state.
 6. Read [laziness-ladder.md](references/laziness-ladder.md) before the first implementation packet and every final code review.
+7. Create one owner-maintained executable plan snapshot at `.harness/work/<chain>.passport.json`, link it from the canonical work item, and run `python goal_runner_validator.py check <snapshot>`. The Markdown work item remains the decision journal; the snapshot is the runnable projection, not a competing source of truth.
 
 ## 2. Decompose before execution
 
 - Choose the smallest sufficient number of measurable subgoals. A large Goal may require 3, 12, 20, or more; do not impose a cosmetic count.
 - Give each subgoal a stable ID, observable result, dependencies, subsystem, risk, acceptance check, execution mode, and proposed model.
+- Before any measured execution, assign explicit bounded baseline and treatment IDs in the Goal state. Do not infer them from model names or fill them in after a run.
 - Build a DAG. Put only dependency-free `ready` subgoals into the next parallel wave.
 - Keep IDs stable. Append discoveries with new IDs; mark removed goals `skipped` with a reason.
 - Group a long list into phases without hiding individual results.
@@ -63,6 +65,7 @@ Read [delegation-contract.md](references/delegation-contract.md) before the firs
 
 - Give every agent a bounded packet: outcome, scope, exclusions, inputs, evidence, acceptance, stop conditions, ownership, role/model, child quota, the first sufficient laziness-ladder rung, and why lower rungs fail.
 - For writing or high risk, make the first agent turn orientation-only. Require a contract acknowledgement and no edits. Compare its restated outcome, boundaries, and proof before sending an implementation follow-up.
+- Immediately before any worker write, validate the current executable plan snapshot with `python goal_runner_validator.py check <snapshot>`. Revalidate after every plan revision, authorization change, or agent-registry change; do not dispatch from an invalid snapshot.
 - Correct an acknowledgement that changes the outcome, expands scope, misses an invariant, or cannot name the acceptance check.
 - Require concise reports with claims, paths, commands, results, unknowns, changed files, risk, and confidence. Do not import raw transcripts or full logs into the parent context.
 - Treat tests, file evidence, and independent review as stronger than agent confidence.
@@ -79,7 +82,10 @@ For each wave:
 6. Run a separate simplify review against the laziness ladder without weakening the safety floor.
 7. Accept, correct, retry once with a narrower contract, or mark blocked.
 8. Update status, ladder decision, simplifications, exceptions, evidence, registries, decisions, and the next wave in the parent work item.
-9. Run targeted checks before fast checks; run full checks according to risk.
+9. At meaningful run or accepted-subgoal checkpoints only, use `python harness_metrics.py record --file <metrics.jsonl> --from <event.json>`. Accept only bounded identifiers and structured fields; use actual runtime token counts or both `null`, never estimates, transcripts, or free text. Run paired compare only when valid pairs exist.
+10. Treat `python harness_benchmark.py --fixture tests/fixtures/hre-001-benchmark.json` as a deterministic regression oracle for common-ground-truth quality semantics. It does not prove real-world token savings or statistical significance.
+11. Acceptance evidence is fresh only for the current relevant repository state; after a relevant change, run `acceptance_gate.py prove` again before accepting manual evidence.
+12. Run targeted checks before fast checks; run full checks according to risk.
 
 Do not reconstruct the parent plan on every cycle. Re-read durable state and only the evidence needed for the next wave.
 
@@ -121,6 +127,7 @@ safe_boundary AND (
 - Treat the third compaction as an emergency maximum.
 - Number successors `<CHAIN> · HNN · <next result>` and register every task ID.
 - Before creating a successor, revalidate every required Goal-state field, require `Approved passport revision` to equal the current `Plan revision`, verify `Approval provenance`, and require `Standing authorization scope` to be `successor creation` or `both`.
+- Before creating a successor, carry only the treatment ID, metrics path/schema, last validated plan snapshot and hash (or equivalent), and current verified boundary. Revalidate that snapshot in the successor; never copy telemetry rows, transcript, chat history, or fabricate token counts.
 - After successor acknowledgement, send an implementation follow-up automatically only when the same authorization still validates and `Standing authorization scope` is `bounded continuation` or `both`. Creation-only authority must stop after verification and request confirmation.
 - Otherwise use normal confirmation.
 - Leave predecessors idle and unarchived. Never keep two chain tasks writing the same checkout.

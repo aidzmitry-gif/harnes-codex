@@ -51,6 +51,24 @@
 7. Для git-проекта выберите commit policy в Goal passport. Рекомендуемый режим — primary-only: один атомарный commit после acceptance каждой подцели, хеш записывается в work item, push остаётся отдельным действием пользователя.
 8. Для каждой write-подцели зафиксируйте первую достаточную ступень лестницы лени и причины отказа от нижних. Перед acceptance выполните correctness-review, затем отдельный simplify-review; не используйте упрощение против safety floor.
 
+### Измеряемый workflow
+
+В Goal work item остаётся единственный журнал решений. Рядом создайте его машиночитаемую проекцию `.harness/work/<chain>.passport.json`, затем запускайте:
+
+```powershell
+python .\goal_runner_validator.py check .harness\work\<chain>.passport.json
+```
+
+Проверка обязательна до каждой записи worker и после изменения плана, authorization или agent registry. До измеряемого запуска назначьте короткие ID baseline/treatment. На контрольных точках запуска или принятой подцели запишите только структурированное событие с реальными runtime-токенами либо парой `null`; не передавайте transcript, свободный текст или оценочные токены. Сравнение запускайте только при наличии валидных пар:
+
+```powershell
+python .\harness_metrics.py record --file .harness\metrics\<chain>.jsonl --from .harness\work\<event>.json
+python .\harness_metrics.py compare --file .harness\metrics\<chain>.jsonl --baseline baseline --treatment treatment
+python .\harness_benchmark.py --fixture .\tests\fixtures\hre-001-benchmark.json
+```
+
+Последняя команда — детерминированное regression evidence качества относительно общего oracle; она не доказывает экономию токенов в реальной разработке и не заявляет статистическую значимость. При `$context-handoff` передавайте только treatment ID, path/schema metrics, последний проверенный passport/hash и verified boundary; в новой задаче снова валидируйте passport. Не копируйте telemetry rows, чаты, transcript или выдуманные токены.
+
 Для удаления выполните `scripts/Uninstall-GoalRunner.ps1 -WhatIf`, затем ту же команду без `-WhatIf`. Удаляются только managed `[agents]`, Goal Runner junction и четыре неизменённых role-файла; общий Context Handoff сохраняется.
 
 Не оценивайте готовность по числу запущенных агентов. Пул до 12 нужен для независимой работы; оркестратор обязан уменьшать волну, если зависимости, доступный runtime или изоляция не позволяют безопасную параллельность.

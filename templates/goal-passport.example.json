@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "chain": {
+    "chainId": "example-goal",
+    "projectRoot": "D:\\path\\to\\project",
+    "dataOwner": "project-owner",
+    "riskClass": "low",
+    "externalSideEffectBoundary": "local-only; no network, deploy, migration, deletion, or secrets",
+    "parentOutcome": "Deliver one verified local outcome through an explicit dependency graph.",
+    "status": "approved",
+    "planRevision": 1,
+    "approvedPassportRevision": 1,
+    "approvalProvenance": "task-id + user approval timestamp",
+    "checkoutWorktreePolicy": "one writer per isolated worktree; primary integrates",
+    "globalAgentCap": 2,
+    "delegationDepthCap": 1,
+    "standingChainAuthorization": "approved",
+    "standingAuthorizationScope": "both",
+    "currentVerifiedSubgoal": "G01",
+    "nextMinimalSliceAcceptance": "Run the owned targeted test, then the configured local checks."
+  },
+  "subgoals": [
+    {
+      "id": "G01",
+      "dependsOn": [],
+      "wave": 1,
+      "status": "done",
+      "execution": "primary",
+      "model": "terra",
+      "worktree": null,
+      "ownedPaths": []
+    },
+    {
+      "id": "G02",
+      "dependsOn": ["G01"],
+      "wave": 2,
+      "status": "ready",
+      "execution": "subagent",
+      "model": "terra",
+      "worktree": "g02",
+      "ownedPaths": ["src/example.py"]
+    }
+  ],
+  "agents": []
+}

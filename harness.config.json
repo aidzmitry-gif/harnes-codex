@@ -7,7 +7,9 @@
   ],
   "allowedChangeRoots": [],
   "fastChecks": [
-    "python -m py_compile acceptance_gate.py",
+    "python -m unittest discover -s tests -v",
+    "python goal_runner_validator.py check templates/goal-passport.example.json",
+    "python harness_benchmark.py --fixture tests/fixtures/hre-001-benchmark.json",
     "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-HarnessGateBootstrap.ps1",
     "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-GoalRunnerArchitecture.ps1"
   ],
