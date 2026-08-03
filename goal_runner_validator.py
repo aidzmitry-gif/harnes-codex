@@ -139,7 +139,11 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
     for identifier in sorted(by_id):
         visit(identifier)
     verified = chain.get("currentVerifiedSubgoal")
-    if "currentVerifiedSubgoal" not in chain or verified is not None and (not isinstance(verified, str) or verified not in by_id or by_id[verified].get("status") not in {"done", "skipped"}):
+    if (
+        "currentVerifiedSubgoal" not in chain
+        or chain.get("standingChainAuthorization") == "approved" and verified is None
+        or verified is not None and (not isinstance(verified, str) or verified not in by_id or by_id[verified].get("status") not in {"done", "skipped"})
+    ):
         fail("CHAIN_VERIFIED", "currentVerifiedSubgoal must name a done or skipped subgoal")
 
     active_writers: list[tuple[str, list[str], str]] = []

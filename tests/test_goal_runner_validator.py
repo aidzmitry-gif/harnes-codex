@@ -30,6 +30,10 @@ class GoalPassportValidationTests(unittest.TestCase):
         passport = valid_passport(); passport["chain"]["standingAuthorizationScope"] = None
         self.assert_code(passport, "CHAIN_AUTH")
 
+    def test_approved_authorization_requires_verified_boundary(self):
+        passport = valid_passport(); passport["chain"]["currentVerifiedSubgoal"] = None
+        self.assert_code(passport, "CHAIN_VERIFIED")
+
     def test_duplicate_and_unknown_dependencies_are_rejected(self):
         passport = valid_passport(); passport["subgoals"][1]["dependsOn"] = ["missing", "missing"]
         self.assert_code(passport, "SUBGOAL_DEPENDS")
