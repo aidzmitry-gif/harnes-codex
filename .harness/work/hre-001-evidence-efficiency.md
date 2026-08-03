@@ -53,18 +53,18 @@
 - Checkout/worktree policy: primary serializes bootstrap; after baseline, independent workers use isolated clean worktrees
 - Commit policy: isolated-worker-allowed; primary integrates and creates parent checkpoints; no push
 - Integration branch/worktree: current root after G01 baseline; dedicated worker worktrees afterward
-- Last accepted commit: `7e19c38` — G06 evidence workflow integrated
+- Last accepted commit: `6ca7f7a` — G07 verifier findings remediated; independent re-verification pending
 - Current laziness-ladder rung: 2 — Python stdlib/PowerShell/Git; no new dependency
 - Rejected lower rungs: YAGNI fails because the user explicitly requested the measured improvements and current audit found missing evidence
-- Retained exceptions / ponytail triggers: none at planning; any linear JSONL scan must name a measured row threshold and indexed upgrade path
+- Retained exceptions / ponytail triggers: paired compare is bounded at 50,000 `pairKey`; measured locally at 1.763 s / 54.06 MiB peak; archive JSONL or add a SQLite index above the cap. Streaming summary remains O(1) memory.
 - Current verified subgoal: G06 — evidence workflow integration accepted
-- Next minimal slice and acceptance check: G07 primary remediates reproduced verifier findings, then independent re-verification, fresh acceptance, strict release and final telemetry checkpoint
+- Next minimal slice and acceptance check: G07 independent re-verification of exact negative probes and full release, then fresh acceptance and final telemetry checkpoint
 - Executable plan snapshot: `.harness/work/hre-001.passport.json`
-- Last validated plan snapshot/hash: `97831027986bcc5ec8deb168952f43813324e322`; validator PASS after first verifier completed read-only audit
+- Last validated plan snapshot/hash: `fea96323726fae563b989d2130f31bc799e02a57`; validator PASS after remediation and re-verifier registration
 - Measurement treatment IDs: baseline `legacy-unchecked` | treatment `harness-evidence-v1`
 - Metrics path/schema: `.harness/metrics/hre-001.jsonl` / schema 1
 - Global agent cap: 12
-- Active agent count: 0
+- Active agent count: 1
 - Delegation depth cap: 2
 - Compaction count: 1
 - Context threshold: 45% when visible
@@ -82,7 +82,7 @@
 | G04 | Исполняемый Goal validator проверяет DAG, ready waves, cap/depth, approval fields и конфликт writer ownership | G01 | 2 | worker: validator + scenario tests | medium | worker / terra-medium | done | `a5c3186` + `cbd111f`; 9 valid/invalid scenario tests PASS; verified-handoff correction accepted |
 | G05 | Benchmark runner выполняет минимум 20 детерминированных сценариев и сравнивает baseline/treatment без LLM-as-judge; реальные модельные запуски можно импортировать позднее | G02,G03,G04 | 3 | worker: benchmarks + fixtures + tests | medium | worker / terra-medium | done | `f12bc69` + `7e650b6`; 20 pairs; objective quality 4/20→20/20, defects/rework 16→0; tokens explicitly unknown; 5 tests + integrated 28 PASS |
 | G06 | Skills, state, templates и документация используют telemetry, freshness, validator и evidence gate; skills загружаются/сравниваются по явному treatment ID | G02,G03,G04,G05 | 4 | worker: skills/docs/templates | medium | worker / terra-medium; primary integration | done | `e3e6c11` + `7e19c38`; 28 tests, passport, benchmark, architecture, installer and postchange-full PASS; noisy duplicate removed |
-| G07 | Независимая correctness/security review, simplify review и полный strict release подтверждают родительский исход | G01-G06 | 5 | verifier read-only + primary | medium | verifier / sol-high | active | first verifier REJECTED: four P1 defects, empty-command/streaming gaps and stale acceptance reproduced; primary remediation required |
+| G07 | Независимая correctness/security review, simplify review и полный strict release подтверждают родительский исход | G01-G06 | 5 | verifier read-only + primary | medium | verifier / sol-high | active | remediation `6ca7f7a`: 35 tests and postchange-full PASS; independent re-verification registered |
 
 ## Волны, роли и ownership
 
@@ -114,6 +114,7 @@ Planned pool peak: 3 write-workers + primary; verifier запускается о
 | `/root/hre_g05_benchmark` | primary | G05 | harness_goal_worker | terra/medium | `.worktrees/g05`; benchmark-owned paths | done | initial scoring rejected; objective-oracle correction accepted and integrated; child quota 0 |
 | `/root/hre_g06_integration` | primary | G06 | harness_goal_worker | terra/medium | `.worktrees/g06`; skills/docs/templates/config paths | done | initial checkpoint corrected for explicit plan continuity and concise output; accepted and integrated; child quota 0 |
 | `/root/hre_g07_verifier` | primary | G07 | harness_goal_verifier | sol/high | read-only integrated tree | done | REJECTED with reproduced blocking findings; no writes; child quota 0 |
+| `/root/hre_g07_reverifier` | primary | G07 | harness_goal_verifier | sol/high | read-only integrated tree | orienting | validated registration after remediation; exact finding probes + full release pending; child quota 0 |
 
 ## Task chain
 
@@ -152,6 +153,9 @@ Planned pool peak: 3 write-workers + primary; verifier запускается о
 | 2026-08-03 | HRE executable passport | validator PASS; Git object hash `437081b4787a60a8259fbc8c4f9e198446302c19` | verified boundary G06; G07 read-only verification ready |
 | 2026-08-03 | G07 verifier registration | validator PASS; snapshot hash `ce61dbca9a5dee6788018f8a0d8bced51ee126e7` | read-only verifier may start; no writer conflict |
 | 2026-08-03 | G07 independent audit | REJECT: telemetry prose/colon-secret; credential fingerprint exposure; validator continuity/ownership/completion fail-open; benchmark expected ignored; empty command passes; JSONL non-streaming; actual evidence stale | remediate only reproduced findings, then repeat independent verification |
+| 2026-08-03 | G07 remediation | `6ca7f7a`; 35 tests; actual/template passports PASS; objective benchmark PASS; postchange full PASS | all reproduced code findings addressed; acceptance evidence intentionally deferred until clean re-verification |
+| 2026-08-03 | compare ponytail measurement | 50,000 pairs in 1.763 s, 54.06 MiB peak | enforce cap; error names archive/SQLite upgrade path; summary streams |
+| 2026-08-03 | G07 re-verifier registration | validator PASS; snapshot hash `fea96323726fae563b989d2130f31bc799e02a57` | second read-only verifier may start |
 
 ## Передача
 

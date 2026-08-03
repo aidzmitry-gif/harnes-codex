@@ -106,6 +106,16 @@
       "ownedPaths": [],
       "status": "done",
       "writer": false
+    },
+    {
+      "id": "hre-g07-reverifier",
+      "subgoalId": "G07",
+      "role": "harness_goal_verifier",
+      "depth": 1,
+      "worktree": null,
+      "ownedPaths": [],
+      "status": "orienting",
+      "writer": false
     }
   ]
 }
