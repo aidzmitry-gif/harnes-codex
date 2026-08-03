@@ -89,12 +89,23 @@
       "id": "G07",
       "dependsOn": ["G01", "G02", "G03", "G04", "G05", "G06"],
       "wave": 5,
-      "status": "ready",
+      "status": "running",
       "execution": "subagent",
       "model": "sol",
       "worktree": null,
       "ownedPaths": []
     }
   ],
-  "agents": []
+  "agents": [
+    {
+      "id": "hre-g07-verifier",
+      "subgoalId": "G07",
+      "role": "harness_goal_verifier",
+      "depth": 1,
+      "worktree": null,
+      "ownedPaths": [],
+      "status": "orienting",
+      "writer": false
+    }
+  ]
 }
