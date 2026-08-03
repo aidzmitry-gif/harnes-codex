@@ -57,9 +57,9 @@ if ($changed.Count -gt 0 -and $isGit -and (Test-Command git)) {
         $hasHead = [bool]$headValue.Trim()
     }
     $diffText = if ($hasHead) {
-        git diff HEAD -- . ':!*.lock' 2>$null
+        git -c core.safecrlf=false diff HEAD -- . ':!*.lock' 2>$null
     } else {
-        git diff --cached -- . ':!*.lock' 2>$null
+        git -c core.safecrlf=false diff --cached -- . ':!*.lock' 2>$null
     }
     $secretPattern = '(?im)(api[_-]?key|secret|password|token)\s*[:=]\s*\S{16,}'
     if ($diffText -match $secretPattern) { Add-Failure 'Diff appears to contain a secret. Remove it and use secure configuration.' }

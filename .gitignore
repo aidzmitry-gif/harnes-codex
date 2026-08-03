@@ -6,6 +6,7 @@ graphify-out/
 
 # Goal Runner worktrees and runtime measurements are local evidence, not source.
 .worktrees/
+.harness/test-tmp/
 .harness/metrics/
 .harness/benchmarks/runs/
 

@@ -4,7 +4,7 @@ param()
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $gate = Join-Path $root 'scripts\Invoke-HarnessGate.ps1'
-$tempRoot = Join-Path ([IO.Path]::GetTempPath()) ("harness-gate-bootstrap-{0}" -f [guid]::NewGuid().ToString('N'))
+$tempRoot = Join-Path $root ('.harness\test-tmp\harness-gate-bootstrap-{0}' -f [guid]::NewGuid().ToString('N'))
 
 try {
     New-Item -ItemType Directory -Path (Join-Path $tempRoot 'scripts') -Force | Out-Null
@@ -20,7 +20,12 @@ try {
     & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $tempRoot 'scripts\Invoke-HarnessGate.ps1') -Stage prechange
     if ($LASTEXITCODE -ne 0) { throw 'Prechange gate failed in a Git repository without HEAD.' }
 
+    $gateText = Get-Content -LiteralPath $gate -Raw
+    $safeDiffCalls = [regex]::Matches($gateText, 'git -c core\.safecrlf=false diff').Count
+    if ($safeDiffCalls -ne 2) { throw 'Both HEAD and unborn-HEAD diff scans must suppress line-ending conversion warnings.' }
+
     Write-Host 'PASS Harness gate supports a new Git repository before its first commit.' -ForegroundColor Green
+    Write-Host 'PASS Harness gate suppresses Git line-ending warnings in both diff scan paths.' -ForegroundColor Green
 } finally {
     if (Test-Path -LiteralPath $tempRoot) {
         [IO.Directory]::Delete($tempRoot, $true)
