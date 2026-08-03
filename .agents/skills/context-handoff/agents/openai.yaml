@@ -1,0 +1,4 @@
+interface:
+  display_name: "Context Handoff"
+  short_description: "Передача работы в чистую задачу"
+  default_prompt: "Use $context-handoff to capture the current project state and prepare a clean successor task."

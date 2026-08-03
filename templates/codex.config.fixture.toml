@@ -1,0 +1,5 @@
+[features]
+goals = true
+
+[windows]
+sandbox = "workspace-write"

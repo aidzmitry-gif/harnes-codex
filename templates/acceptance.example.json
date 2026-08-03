@@ -1,0 +1,16 @@
+{
+  "criteria": [
+    {
+      "id": "targeted-test",
+      "kind": "command",
+      "description": "Replace with the smallest test that proves the requested behaviour.",
+      "command": "replace-with-a-safe-project-command"
+    },
+    {
+      "id": "review",
+      "kind": "manual",
+      "description": "Diff review confirms scope, compatibility, security and rollback.",
+      "evidence": ""
+    }
+  ]
+}

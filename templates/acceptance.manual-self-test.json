@@ -1,0 +1,16 @@
+{
+  "criteria": [
+    {
+      "id": "json-profile",
+      "kind": "command",
+      "description": "The project profile example is valid JSON.",
+      "command": "python -m json.tool templates/project-profile.example.json"
+    },
+    {
+      "id": "review",
+      "kind": "manual",
+      "description": "A manual criterion must require evidence.",
+      "evidence": ""
+    }
+  ]
+}

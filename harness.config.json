@@ -1,0 +1,22 @@
+{
+  "protectedPaths": [
+    ".env",
+    ".env.*",
+    "secrets/",
+    "infra/production/"
+  ],
+  "allowedChangeRoots": [],
+  "fastChecks": [
+    "python -m py_compile acceptance_gate.py",
+    "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-HarnessGateBootstrap.ps1",
+    "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-GoalRunnerArchitecture.ps1"
+  ],
+  "fullChecks": [
+    "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-GoalRunnerInstaller.ps1"
+  ],
+  "requiredWorkItemFor": [
+    "prechange",
+    "postchange",
+    "release"
+  ]
+}

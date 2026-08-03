@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+
+# Local Graphify indexes, query memory, and generated visualizations.
+graphify-out/
+
+# Goal Runner worktrees and runtime measurements are local evidence, not source.
+.worktrees/
+.harness/metrics/
+.harness/benchmarks/runs/
+
+# Transactional and temporary files.
+*.tmp
+*.bak

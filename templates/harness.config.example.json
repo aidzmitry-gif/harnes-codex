@@ -1,0 +1,7 @@
+{
+  "protectedPaths": [".env", ".env.*", "secrets/", "infra/production/"],
+  "allowedChangeRoots": [],
+  "fastChecks": [],
+  "fullChecks": [],
+  "requiredWorkItemFor": ["prechange", "postchange", "release"]
+}

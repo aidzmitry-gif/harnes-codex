@@ -1,0 +1,21 @@
+{
+  "project": "replace-with-project-name",
+  "risk": "medium",
+  "owner": "team-or-person",
+  "protectedPaths": [
+    ".env",
+    ".env.*",
+    "migrations/",
+    "infra/production/"
+  ],
+  "approvalRequiredFor": [
+    "production access",
+    "schema migration",
+    "external publication",
+    "secret handling",
+    "irreversible data operation"
+  ],
+  "fastChecks": [],
+  "fullChecks": [],
+  "acceptanceTemplate": "templates/acceptance.example.json"
+}

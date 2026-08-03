@@ -1,0 +1,22 @@
+{
+  "criteria": [
+    {
+      "id": "architecture",
+      "kind": "command",
+      "description": "Goal Runner skill, agent roles, TOML cap and handoff invariants are consistent.",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-GoalRunnerArchitecture.ps1"
+    },
+    {
+      "id": "installer",
+      "kind": "command",
+      "description": "Manifest-backed installation is byte-idempotent, rejects unmanaged paths, rolls back safely and uninstalls cleanly across source version drift.",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-GoalRunnerInstaller.ps1"
+    },
+    {
+      "id": "review",
+      "kind": "manual",
+      "description": "Explicit file review confirms scope, compatibility, security, rollback and no concurrent writer violation.",
+      "evidence": ""
+    }
+  ]
+}

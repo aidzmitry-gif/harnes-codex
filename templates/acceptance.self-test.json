@@ -1,0 +1,16 @@
+{
+  "criteria": [
+    {
+      "id": "json-profile",
+      "kind": "command",
+      "description": "The project profile example is valid JSON.",
+      "command": "python -m json.tool templates/project-profile.example.json"
+    },
+    {
+      "id": "json-template",
+      "kind": "command",
+      "description": "The acceptance template is valid JSON.",
+      "command": "python -m json.tool templates/acceptance.example.json"
+    }
+  ]
+}

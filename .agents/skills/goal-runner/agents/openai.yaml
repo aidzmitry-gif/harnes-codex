@@ -1,0 +1,4 @@
+interface:
+  display_name: "Goal Runner"
+  short_description: "Оркестрация больших целей и субагентов"
+  default_prompt: "Use $goal-runner to decompose a large goal, present its measurable subgoals, and execute the approved DAG with controlled subagents."
