@@ -115,9 +115,9 @@ def load_fixture(path: Path) -> list[dict[str, Any]]:
         raise ValueError("fixture must contain at least 20 scenarios")
     identifiers: set[str] = set()
     for scenario in scenarios:
-        if not isinstance(scenario, dict) or set(scenario) != {"id", "adapter", "case", "expected"}:
+        if not isinstance(scenario, dict) or set(scenario) != {"id", "adapter", "case", "expected", "shouldAccept"}:
             raise ValueError("fixture scenario has unsafe fields")
-        identifier, adapter, case, expected = scenario["id"], scenario["adapter"], scenario["case"], scenario["expected"]
+        identifier, adapter, case, expected, should_accept = scenario["id"], scenario["adapter"], scenario["case"], scenario["expected"], scenario["shouldAccept"]
         if not isinstance(identifier, str) or not SAFE_IDENTIFIER.fullmatch(identifier) or identifier in identifiers:
             raise ValueError("fixture scenario IDs must be unique safe identifiers")
         identifiers.add(identifier)
@@ -125,6 +125,8 @@ def load_fixture(path: Path) -> list[dict[str, Any]]:
             raise ValueError("fixture selects an unsafe adapter or case")
         if not isinstance(expected, dict) or set(expected) != set(MODES) or any(not isinstance(expected[item], bool) for item in MODES):
             raise ValueError("fixture expected results must name both modes")
+        if not isinstance(should_accept, bool):
+            raise ValueError("fixture shouldAccept must be boolean")
     return scenarios
 
 
@@ -147,13 +149,13 @@ def run_fixture(path: Path) -> dict[str, Any]:
             verdicts[mode]["accepted" if result else "rejected"] += 1
             duration = max(0, round((time.monotonic() - started) * 1000))
             total_duration += duration
-            accepted = result == scenario["expected"][mode]
+            accepted = result == scenario["shouldAccept"]
             records.append(harness_metrics.normalize_event({
                 "runId": f"benchmark-{scenario['id']}-{mode}", "pairKey": scenario["id"],
                 "chainId": "HRE-001", "subgoalId": "G05", "treatment": mode, "mode": "benchmark",
                 "model": None, "reasoningEffort": None, "inputTokens": None, "outputTokens": None,
-                "durationMs": duration, "attempts": 1, "reworkCount": 0, "accepted": accepted,
-                "released": accepted, "used": accepted, "escapedDefects": 0 if accepted else 1,
+                "durationMs": duration, "attempts": 1, "reworkCount": 0 if accepted else 1, "accepted": accepted,
+                "released": accepted, "used": accepted, "escapedDefects": int(result and not scenario["shouldAccept"]),
                 "checksPassed": 1 if accepted else 0, "checksFailed": 0 if accepted else 1,
             }, recorded_at="2026-08-03T00:00:00Z"))
         if outcomes["baseline"] != outcomes["treatment"]:

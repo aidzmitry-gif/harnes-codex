@@ -38,8 +38,17 @@ class HarnessBenchmarkTests(unittest.TestCase):
             self.assertIn("release", report["quality"][mode])
             self.assertIn("usage", report["quality"][mode])
         self.assertIn("durationMs", report["measurement"])
-        self.assertGreater(report["objectiveVerdicts"]["contractChangeCases"], 0)
-        self.assertGreater(report["objectiveVerdicts"]["baseline"]["accepted"], report["objectiveVerdicts"]["treatment"]["accepted"])
+        self.assertEqual(4, report["quality"]["baseline"]["accepted"])
+        self.assertEqual(20, report["quality"]["treatment"]["accepted"])
+        self.assertEqual(16, report["quality"]["baseline"]["escapedDefects"])
+        self.assertEqual(0, report["quality"]["treatment"]["escapedDefects"])
+        self.assertEqual(16, report["quality"]["baseline"]["reworkTotal"])
+        self.assertEqual(0, report["quality"]["treatment"]["reworkTotal"])
+        self.assertEqual(0.8, report["comparison"]["deltas"]["accepted"]["mean"])
+        self.assertEqual(-0.8, report["comparison"]["deltas"]["defects"]["mean"])
+        self.assertEqual(-0.8, report["comparison"]["deltas"]["rework"]["mean"])
+        self.assertEqual(0.8, report["comparison"]["deltas"]["release"]["mean"])
+        self.assertEqual(0.8, report["comparison"]["deltas"]["usage"]["mean"])
 
     def test_expected_contract_improvement_mismatch_is_caught(self):
         scenario = copy.deepcopy(harness_benchmark.load_fixture(FIXTURE)[1])
@@ -56,6 +65,7 @@ class HarnessBenchmarkTests(unittest.TestCase):
             lambda data: data["scenarios"].append(copy.deepcopy(data["scenarios"][0])),
             lambda data: data["scenarios"][0].update({"command": "echo unsafe"}),
             lambda data: data["scenarios"][0].update({"id": "token=unsafe"}),
+            lambda data: data["scenarios"][0].pop("shouldAccept"),
         ):
             candidate = copy.deepcopy(valid); mutation(candidate)
             path = Path(self.id().replace(".", "_") + ".json")
