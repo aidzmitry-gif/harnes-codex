@@ -53,12 +53,12 @@
 - Checkout/worktree policy: primary serializes bootstrap; after baseline, independent workers use isolated clean worktrees
 - Commit policy: isolated-worker-allowed; primary integrates and creates parent checkpoints; no push
 - Integration branch/worktree: current root after G01 baseline; dedicated worker worktrees afterward
-- Last accepted commit: `d3ac1db` — independent G07 exact re-probe accepted; fresh acceptance and final telemetry pending
+- Last accepted commit: `008ae1e` — fresh schema-v2 HRE-001 and Goal Runner architecture acceptance evidence
 - Current laziness-ladder rung: 2 — Python stdlib/PowerShell/Git; no new dependency
 - Rejected lower rungs: YAGNI fails because the user explicitly requested the measured improvements and current audit found missing evidence
 - Retained exceptions / ponytail triggers: paired compare is bounded at 50,000 `pairKey`; measured locally at 1.763 s / 54.06 MiB peak; archive JSONL or add a SQLite index above the cap. Streaming summary remains O(1) memory.
 - Current verified subgoal: G07 — independent correctness/security and simplify re-probe accepted
-- Next minimal slice and acceptance check: fresh schema-v2 acceptance evidence, one clean strict release and exactly one privacy-safe telemetry event; all criteria remain fresh/PASS with tokens unknown
+- Next minimal slice and acceptance check: user reviews the completed HRE-001 result; archive only after a separate explicit chain command
 - Executable plan snapshot: `.harness/work/hre-001.passport.json`
 - Last validated plan snapshot/hash: `a609ef75a66c39eace14f6106a75ac234c774baa`; validator PASS after G07 completion state
 - Measurement treatment IDs: baseline `legacy-unchecked` | treatment `harness-evidence-v1`
@@ -161,9 +161,13 @@ Planned pool peak: 3 write-workers + primary; verifier запускается о
 | 2026-08-03 | G07 path-safety remediation | `d993d4f`; 38 tests; actual/template passports PASS; postchange full PASS | Windows/backslash/traversal declarations fail closed; segment-bound ownership, no-read regression, and measured `ponytail:` marker ready for exact re-probe |
 | 2026-08-03 | G07 exact independent re-probe | PASS at `29cdb4c`; focused 33 and full 38 tests; actual/template passports; benchmark; architecture; installer; diff-check; strict release; Git clean | all prior P1-P3 findings closed; proceed to fresh acceptance, truthful telemetry, and final closure |
 | 2026-08-04 | H02 authorization + prechange | standing contract revalidated at clean `3eebbca`; passport PASS/hash matched; prechange PASS with 38 tests | sole primary writer may close G07 state before refreshing evidence |
+| 2026-08-04 | G07 state checkpoint | `3250c73`; G07 `done`, chain `awaiting-user-review`, current verified subgoal G07, active agents 0; validator PASS; passport hash `a609ef75a66c39eace14f6106a75ac234c774baa` | final evidence can be measured against a committed passport state |
+| 2026-08-04 | schema-v2 acceptance | `008ae1e`; HRE-001 6/6 PASS and goal-runner-architecture 3/3 PASS; both manual reviews freshly fingerprinted; HRE plan criterion checks `.harness/work/hre-001.passport.json` | acceptance artifacts are current for the final relevant repository state |
+| 2026-08-04 | clean strict release | PASS from clean `008ae1e`; 38 tests and 6 configured checks passed; actual wall duration 19,278 ms | strict-release-ready parent outcome confirmed without network or publication |
+| 2026-08-04 | final telemetry | exactly one schema-1 JSONL event; duration 19,278 ms, attempts 1, rework/defects/check failures 0, checks passed 6, accepted true, released/used false, tokens both `null`; summary keeps token totals `null` with known coverage 0 | records only observed bounded fields; no production token-saving or significance claim |
 
 ## Передача
 
-- Что изменено: только создан parent work item и Goal passport; production/source implementation не начата.
-- Доказательства: перечислены в журнале; новый acceptance будет создан после approval.
-- Остаточный риск / ограничения: runtime token counts могут быть недоступны; схема обязана хранить `unknown`, а не оценку. Статистический вывод требует реальных повторных парных запусков после доставки инструмента.
+- Что изменено: HRE-001 завершён на verified boundary G07; state и свежие schema-v2 acceptance artifacts сохранены атомарными checkpoints; telemetry остаётся локальным исключённым runtime evidence.
+- Доказательства: validator PASS/hash `a609ef75a66c39eace14f6106a75ac234c774baa`; HRE-001 6/6 и architecture 3/3 acceptance PASS; clean strict release PASS за 19,278 ms; одна telemetry-запись суммируется без известных токенов.
+- Остаточный риск / ограничения: runtime token counts недоступны и сохранены как `null`; synthetic 20-pair benchmark доказывает только детерминированную регрессионную семантику, не production token savings и не статистическую значимость. Результат не опубликован и не использован; chain не архивирована.
