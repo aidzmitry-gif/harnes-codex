@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "chain": {
+    "chainId": "HRE-001",
+    "projectRoot": "D:\\6 Проекты\\Харнес разработка",
+    "dataOwner": "workspace-owner",
+    "riskClass": "medium",
+    "externalSideEffectBoundary": "local files and local Git only; no network, push, deploy, migration, deletion, or secrets",
+    "parentOutcome": "Deliver a measured, reproducible, strict-release-ready Harness workflow.",
+    "status": "running",
+    "planRevision": 1,
+    "approvedPassportRevision": 1,
+    "approvalProvenance": "task 019fbcf5-d20e-74b3-ac9d-5ca89a78f462; user approved HRE-001 revision 1 on 2026-08-03 Europe/Minsk",
+    "canonicalWorkItemPath": ".harness/work/hre-001-evidence-efficiency.md",
+    "checkoutWorktreePolicy": "one writer per isolated worktree; primary integrates",
+    "globalAgentCap": 12,
+    "delegationDepthCap": 2,
+    "standingChainAuthorization": "approved",
+    "standingAuthorizationScope": "both",
+    "currentVerifiedSubgoal": "G06",
+    "nextMinimalSliceAcceptance": "G07 independent read-only verification followed by strict release and fresh acceptance evidence.",
+    "baselineId": "legacy-unchecked",
+    "treatmentId": "harness-evidence-v1",
+    "metricsPath": ".harness/metrics/hre-001.jsonl",
+    "metricsSchemaVersion": 1
+  },
+  "subgoals": [
+    {
+      "id": "G01",
+      "dependsOn": [],
+      "wave": 1,
+      "status": "done",
+      "execution": "primary",
+      "model": "sol",
+      "worktree": null,
+      "ownedPaths": [".gitignore", "harness.config.json", "scripts/Invoke-HarnessGate.ps1", "scripts/Test-HarnessGateBootstrap.ps1"]
+    },
+    {
+      "id": "G02",
+      "dependsOn": ["G01"],
+      "wave": 2,
+      "status": "done",
+      "execution": "subagent",
+      "model": "terra",
+      "worktree": "g02",
+      "ownedPaths": ["harness_metrics.py", "tests/test_harness_metrics.py"]
+    },
+    {
+      "id": "G03",
+      "dependsOn": ["G01"],
+      "wave": 2,
+      "status": "done",
+      "execution": "subagent",
+      "model": "terra",
+      "worktree": "g03",
+      "ownedPaths": ["acceptance_gate.py", "tests/test_acceptance_gate.py"]
+    },
+    {
+      "id": "G04",
+      "dependsOn": ["G01"],
+      "wave": 2,
+      "status": "done",
+      "execution": "subagent",
+      "model": "terra",
+      "worktree": "g04",
+      "ownedPaths": ["goal_runner_validator.py", "tests/test_goal_runner_validator.py"]
+    },
+    {
+      "id": "G05",
+      "dependsOn": ["G02", "G03", "G04"],
+      "wave": 3,
+      "status": "done",
+      "execution": "subagent",
+      "model": "terra",
+      "worktree": "g05",
+      "ownedPaths": ["harness_benchmark.py", "tests/test_harness_benchmark.py", "tests/fixtures/hre-001-benchmark.json"]
+    },
+    {
+      "id": "G06",
+      "dependsOn": ["G02", "G03", "G04", "G05"],
+      "wave": 4,
+      "status": "done",
+      "execution": "subagent",
+      "model": "terra",
+      "worktree": "g06",
+      "ownedPaths": [".agents/skills", "README.md", "docs", "templates", "harness.config.json", "scripts/Test-GoalRunnerArchitecture.ps1"]
+    },
+    {
+      "id": "G07",
+      "dependsOn": ["G01", "G02", "G03", "G04", "G05", "G06"],
+      "wave": 5,
+      "status": "ready",
+      "execution": "subagent",
+      "model": "sol",
+      "worktree": null,
+      "ownedPaths": []
+    }
+  ],
+  "agents": []
+}

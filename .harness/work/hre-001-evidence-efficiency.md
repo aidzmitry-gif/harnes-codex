@@ -53,12 +53,16 @@
 - Checkout/worktree policy: primary serializes bootstrap; after baseline, independent workers use isolated clean worktrees
 - Commit policy: isolated-worker-allowed; primary integrates and creates parent checkpoints; no push
 - Integration branch/worktree: current root after G01 baseline; dedicated worker worktrees afterward
-- Last accepted commit: `7e650b6` — G05 objective-oracle benchmark accepted
+- Last accepted commit: `7e19c38` — G06 evidence workflow integrated
 - Current laziness-ladder rung: 2 — Python stdlib/PowerShell/Git; no new dependency
 - Rejected lower rungs: YAGNI fails because the user explicitly requested the measured improvements and current audit found missing evidence
 - Retained exceptions / ponytail triggers: none at planning; any linear JSONL scan must name a measured row threshold and indexed upgrade path
-- Current verified subgoal: G05 — deterministic 20-case objective-oracle benchmark accepted
-- Next minimal slice and acceptance check: G06 integrate validator, metrics, benchmark and freshness into skills/state/templates/docs and lifecycle checks
+- Current verified subgoal: G06 — evidence workflow integration accepted
+- Next minimal slice and acceptance check: G07 independent read-only verification, actual acceptance gate, strict release and final telemetry checkpoint
+- Executable plan snapshot: `.harness/work/hre-001.passport.json`
+- Last validated plan snapshot/hash: `437081b4787a60a8259fbc8c4f9e198446302c19`; validator PASS
+- Measurement treatment IDs: baseline `legacy-unchecked` | treatment `harness-evidence-v1`
+- Metrics path/schema: `.harness/metrics/hre-001.jsonl` / schema 1
 - Global agent cap: 12
 - Active agent count: 0
 - Delegation depth cap: 2
@@ -77,7 +81,7 @@
 | G03 | Acceptance evidence связано с fingerprint и временем; устаревшее manual evidence отклоняется; старые JSON продолжают читаться | G01 | 2 | worker: `acceptance_gate.py` + acceptance tests/templates | medium | worker / terra-medium | done | `0f54335`; 9 compatibility/freshness/timeout tests PASS in normal sandbox; review PASS |
 | G04 | Исполняемый Goal validator проверяет DAG, ready waves, cap/depth, approval fields и конфликт writer ownership | G01 | 2 | worker: validator + scenario tests | medium | worker / terra-medium | done | `a5c3186` + `cbd111f`; 9 valid/invalid scenario tests PASS; verified-handoff correction accepted |
 | G05 | Benchmark runner выполняет минимум 20 детерминированных сценариев и сравнивает baseline/treatment без LLM-as-judge; реальные модельные запуски можно импортировать позднее | G02,G03,G04 | 3 | worker: benchmarks + fixtures + tests | medium | worker / terra-medium | done | `f12bc69` + `7e650b6`; 20 pairs; objective quality 4/20→20/20, defects/rework 16→0; tokens explicitly unknown; 5 tests + integrated 28 PASS |
-| G06 | Skills, state, templates и документация используют telemetry, freshness, validator и evidence gate; skills загружаются/сравниваются по явному treatment ID | G02,G03,G04,G05 | 4 | worker: skills/docs/templates | medium | worker / terra-medium; primary integration | planned | architecture test updated; README/ADOPTION examples execute |
+| G06 | Skills, state, templates и документация используют telemetry, freshness, validator и evidence gate; skills загружаются/сравниваются по явному treatment ID | G02,G03,G04,G05 | 4 | worker: skills/docs/templates | medium | worker / terra-medium; primary integration | done | `e3e6c11` + `7e19c38`; 28 tests, passport, benchmark, architecture, installer and postchange-full PASS; noisy duplicate removed |
 | G07 | Независимая correctness/security review, simplify review и полный strict release подтверждают родительский исход | G01-G06 | 5 | verifier read-only + primary | medium | verifier / sol-high | planned | targeted→fast→full; benchmark; postchange/release strict; diff and rollback review |
 
 ## Волны, роли и ownership
@@ -108,6 +112,7 @@ Planned pool peak: 3 write-workers + primary; verifier запускается о
 | `/root/hre_g03_acceptance` | primary | G03 | harness_goal_worker | terra/medium | `.worktrees/g03`; acceptance-owned paths | done | checkpoint accepted and integrated; child quota 0 |
 | `/root/hre_g04_validator` | primary | G04 | harness_goal_worker | terra/medium | `.worktrees/g04`; validator-owned paths | done | correction checkpoint accepted and integrated; child quota 0 |
 | `/root/hre_g05_benchmark` | primary | G05 | harness_goal_worker | terra/medium | `.worktrees/g05`; benchmark-owned paths | done | initial scoring rejected; objective-oracle correction accepted and integrated; child quota 0 |
+| `/root/hre_g06_integration` | primary | G06 | harness_goal_worker | terra/medium | `.worktrees/g06`; skills/docs/templates/config paths | done | initial checkpoint corrected for explicit plan continuity and concise output; accepted and integrated; child quota 0 |
 | planned-W5-verifier | primary | G07 | harness_goal_verifier | sol/high | read-only integrated tree | planned | pending |
 
 ## Task chain
@@ -125,6 +130,7 @@ Planned pool peak: 3 write-workers + primary; verifier запускается о
 | 1 execution / 2026-08-03 Europe/Minsk | preflight exposed unborn-HEAD and Windows PowerShell compatibility defects | fixed inside G01 with one regression script; no new dependency | Wave 1 acceptance strengthened; DAG unchanged |
 | 1 wave 2 / 2026-08-03 Europe/Minsk | 23 integrated unit/scenario tests PASS; independent review found and corrected temp sandbox and verified-handoff gaps | accept G02–G04; preserve stdlib rung; add Windows LF/CRLF gate regression | Wave 3 G05 ready; DAG unchanged |
 | 1 wave 3 / 2026-08-03 Europe/Minsk | initial benchmark falsely scored both modes at 100%; objective-oracle correction yields baseline 4/20 vs treatment 20/20 | reject fidelity-as-quality; accept only common-ground-truth scoring | Wave 4 G06 ready; DAG unchanged |
+| 1 wave 4 / 2026-08-03 Europe/Minsk | independent review found missing measurement fields/hash recipe and duplicate benchmark output | require executable plan continuity and remove repeated noisy execution | G06 accepted after correction; Wave 5 G07 ready |
 
 ## Журнал проверок
 
@@ -141,6 +147,9 @@ Planned pool peak: 3 write-workers + primary; verifier запускается о
 | 2026-08-03 | Windows LF/CRLF preflight regression | `f1a8bde`; bootstrap regression and parent prechange PASS | Git warning no longer aborts PowerShell gate |
 | 2026-08-03 | G05 independent benchmark review | initial checkpoint rejected: mode-specific expected behavior made quality 100% for both modes | require a shared objective oracle before integration |
 | 2026-08-03 | G05 corrected checkpoint + integrated suite | `f12bc69` + `7e650b6`; 20 pairs; quality +0.8, defects/rework -0.8, 28 tests PASS | G05 accepted; no token estimate; G06 ready |
+| 2026-08-03 | G06 independent integration review | initial checkpoint passed tests but omitted continuity fields from example and duplicated benchmark output | narrow correction required before acceptance |
+| 2026-08-03 | G06 corrected checkpoint + postchange full | `e3e6c11` + `7e19c38`; all configured checks PASS | G06 accepted; actual HRE passport created for G07 |
+| 2026-08-03 | HRE executable passport | validator PASS; Git object hash `437081b4787a60a8259fbc8c4f9e198446302c19` | verified boundary G06; G07 read-only verification ready |
 
 ## Передача
 
