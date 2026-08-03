@@ -44,7 +44,7 @@
 - Risk class: medium
 - External-side-effect boundary: только локальные файлы и локальный Git; без network, push, публикации, deploy, миграций и секретов
 - Parent outcome: доказательно измеримый, воспроизводимый и strict-release-ready Харнес
-- Status: approved
+- Status: running
 - Plan revision: 1
 - Approved passport revision: 1
 - Approval provenance: task `019fbcf5-d20e-74b3-ac9d-5ca89a78f462`; user message `Подтверждаю HRE-001 revision 1.`; 2026-08-03 Europe/Minsk
@@ -53,16 +53,16 @@
 - Checkout/worktree policy: primary serializes bootstrap; after baseline, independent workers use isolated clean worktrees
 - Commit policy: isolated-worker-allowed; primary integrates and creates parent checkpoints; no push
 - Integration branch/worktree: current root after G01 baseline; dedicated worker worktrees afterward
-- Last accepted commit: unavailable before G01
+- Last accepted commit: `cbd111f` — Wave 2 integrated; follow-up Windows gate fix `f1a8bde`
 - Current laziness-ladder rung: 2 — Python stdlib/PowerShell/Git; no new dependency
 - Rejected lower rungs: YAGNI fails because the user explicitly requested the measured improvements and current audit found missing evidence
 - Retained exceptions / ponytail triggers: none at planning; any linear JSONL scan must name a measured row threshold and indexed upgrade path
-- Current verified subgoal: none; planning only
-- Next minimal slice and acceptance check: G01 bootstrap; `git status --short` plus strict prechange gate and baseline manifest review
+- Current verified subgoal: G04 — Wave 2 telemetry, acceptance freshness and Goal validator accepted
+- Next minimal slice and acceptance check: G05 deterministic 20-case paired benchmark in one isolated worktree; benchmark unit tests and executable report
 - Global agent cap: 12
 - Active agent count: 0
 - Delegation depth cap: 2
-- Compaction count: 0
+- Compaction count: 1
 - Context threshold: 45% when visible
 - Standing chain authorization: approved
 - Standing authorization scope: both
@@ -72,10 +72,10 @@
 
 | ID | Наблюдаемый результат | Depends on | Wave | Подсистема / ownership | Риск | Исполнение / модель | Статус | Acceptance/evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| G01 | Локальный Git baseline, `.gitignore` и strict `harness.config.json` делают область изменений и проверки воспроизводимыми | none | 1 | primary: repo/config | medium | primary / sol | planned | reviewed baseline paths; architecture+installer; strict prechange PASS |
-| G02 | Versioned JSONL telemetry записывает run/subgoal/mode/model, реальные tokens или unknown, duration, attempts, rework, acceptance, release/usage и defects; summary/paired compare воспроизводимы | G01 | 2 | worker: metrics module + metrics tests | medium | worker / terra-medium | planned | unit tests for schema, append, redaction, summary, paired comparison |
-| G03 | Acceptance evidence связано с fingerprint и временем; устаревшее manual evidence отклоняется; старые JSON продолжают читаться | G01 | 2 | worker: `acceptance_gate.py` + acceptance tests/templates | medium | worker / terra-medium | planned | compatibility, stale/fresh, timeout/duration and failure tests |
-| G04 | Исполняемый Goal validator проверяет DAG, ready waves, cap/depth, approval fields и конфликт writer ownership | G01 | 2 | worker: validator + scenario tests | medium | worker / terra-medium | planned | deterministic valid/invalid scenario suite PASS |
+| G01 | Локальный Git baseline, `.gitignore` и strict `harness.config.json` делают область изменений и проверки воспроизводимыми | none | 1 | primary: repo/config | medium | primary / sol | done | `d39520d`; staged path review; release PASS; clean strict prechange PASS; unborn-HEAD regression PASS |
+| G02 | Versioned JSONL telemetry записывает run/subgoal/mode/model, реальные tokens или unknown, duration, attempts, rework, acceptance, release/usage и defects; summary/paired compare воспроизводимы | G01 | 2 | worker: metrics module + metrics tests | medium | worker / terra-medium | done | `46b3282` + `677a73e` + `54ac34b`; 5 unit tests PASS in normal sandbox; diff/security review PASS |
+| G03 | Acceptance evidence связано с fingerprint и временем; устаревшее manual evidence отклоняется; старые JSON продолжают читаться | G01 | 2 | worker: `acceptance_gate.py` + acceptance tests/templates | medium | worker / terra-medium | done | `0f54335`; 9 compatibility/freshness/timeout tests PASS in normal sandbox; review PASS |
+| G04 | Исполняемый Goal validator проверяет DAG, ready waves, cap/depth, approval fields и конфликт writer ownership | G01 | 2 | worker: validator + scenario tests | medium | worker / terra-medium | done | `a5c3186` + `cbd111f`; 9 valid/invalid scenario tests PASS; verified-handoff correction accepted |
 | G05 | Benchmark runner выполняет минимум 20 детерминированных сценариев и сравнивает baseline/treatment без LLM-as-judge; реальные модельные запуски можно импортировать позднее | G02,G03,G04 | 3 | worker: benchmarks + fixtures + tests | medium | worker / terra-medium | planned | 20+ cases PASS; paired report contains quality/cost/time/rework/release metrics |
 | G06 | Skills, state, templates и документация используют telemetry, freshness, validator и evidence gate; skills загружаются/сравниваются по явному treatment ID | G02,G03,G04,G05 | 4 | worker: skills/docs/templates | medium | worker / terra-medium; primary integration | planned | architecture test updated; README/ADOPTION examples execute |
 | G07 | Независимая correctness/security review, simplify review и полный strict release подтверждают родительский исход | G01-G06 | 5 | verifier read-only + primary | medium | verifier / sol-high | planned | targeted→fast→full; benchmark; postchange/release strict; diff and rollback review |
@@ -104,9 +104,9 @@ Planned pool peak: 3 write-workers + primary; verifier запускается о
 
 | Agent/task | Parent | Subgoal | Role | Model/effort | Worktree/files | Status | Report/evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| planned-W2-metrics | primary | G02 | harness_goal_worker | terra/medium | isolated; metrics-owned paths | planned | pending acknowledgement |
-| planned-W2-acceptance | primary | G03 | harness_goal_worker | terra/medium | isolated; acceptance-owned paths | planned | pending acknowledgement |
-| planned-W2-validator | primary | G04 | harness_goal_worker | terra/medium | isolated; validator-owned paths | planned | pending acknowledgement |
+| `/root/hre_g02_metrics` | primary | G02 | harness_goal_worker | terra/medium | `.worktrees/g02`; metrics-owned paths | done | sandbox-safe checkpoint accepted and integrated; child quota 0 |
+| `/root/hre_g03_acceptance` | primary | G03 | harness_goal_worker | terra/medium | `.worktrees/g03`; acceptance-owned paths | done | checkpoint accepted and integrated; child quota 0 |
+| `/root/hre_g04_validator` | primary | G04 | harness_goal_worker | terra/medium | `.worktrees/g04`; validator-owned paths | done | correction checkpoint accepted and integrated; child quota 0 |
 | planned-W5-verifier | primary | G07 | harness_goal_verifier | sol/high | read-only integrated tree | planned | pending |
 
 ## Task chain
@@ -121,6 +121,8 @@ Planned pool peak: 3 write-workers + primary; verifier запускается о
 | --- | --- | --- | --- |
 | 1 / 2026-08-03 Europe/Minsk | audit: tests PASS; strict release WARN/FAIL; metrics/benchmark absent | 7 subgoals; one stdlib evidence contour; peak 3 writers | initial DAG |
 | 1 approved / 2026-08-03 Europe/Minsk | explicit user message in primary task | passport revision 1 approved; standing scope `both`; local Git/worktrees/checkpoints authorized | Wave 1 ready |
+| 1 execution / 2026-08-03 Europe/Minsk | preflight exposed unborn-HEAD and Windows PowerShell compatibility defects | fixed inside G01 with one regression script; no new dependency | Wave 1 acceptance strengthened; DAG unchanged |
+| 1 wave 2 / 2026-08-03 Europe/Minsk | 23 integrated unit/scenario tests PASS; independent review found and corrected temp sandbox and verified-handoff gaps | accept G02–G04; preserve stdlib rung; add Windows LF/CRLF gate regression | Wave 3 G05 ready; DAG unchanged |
 
 ## Журнал проверок
 
@@ -130,6 +132,11 @@ Planned pool peak: 3 write-workers + primary; verifier запускается о
 | 2026-08-03 | strict release | FAIL on three warnings: no Git/config/checks | G01 is prerequisite, not a cosmetic task |
 | 2026-08-03 | `Invoke-HarnessGate.ps1 -Stage prechange` | PASS with expected warnings: no config/checks | warnings are the verified target of G01; implementation remains paused for passport approval |
 | 2026-08-03 | Goal passport approval | PASS; exact revision 1 and current task ID recorded | begin G01 with primary as sole writer |
+| 2026-08-03 | G01 release gate | PASS; architecture, installer, Python compile, bootstrap regression | baseline is eligible for checkpoint |
+| 2026-08-03 | G01 checkpoint + strict prechange | `d39520d`; PASS from clean state | G01 done; Wave 2 ready |
+| 2026-08-03 | Wave 2 independent targeted tests | G02 5 PASS; G03 9 PASS; G04 9 PASS; all diff checks PASS | accept all three isolated checkpoints after corrections |
+| 2026-08-03 | Wave 2 integrated suite | 23 PASS in normal sandbox | G02–G04 integrated; G05 interfaces stable |
+| 2026-08-03 | Windows LF/CRLF preflight regression | `f1a8bde`; bootstrap regression and parent prechange PASS | Git warning no longer aborts PowerShell gate |
 
 ## Передача
 
