@@ -53,18 +53,18 @@
 - Checkout/worktree policy: primary serializes bootstrap; after baseline, independent workers use isolated clean worktrees
 - Commit policy: isolated-worker-allowed; primary integrates and creates parent checkpoints; no push
 - Integration branch/worktree: current root after G01 baseline; dedicated worker worktrees afterward
-- Last accepted commit: `d993d4f` — G07 path-safety remediation passed the full postchange gate; exact re-probe pending
+- Last accepted commit: `29cdb4c` — independent G07 exact re-probe PASS; fresh acceptance and final telemetry pending
 - Current laziness-ladder rung: 2 — Python stdlib/PowerShell/Git; no new dependency
 - Rejected lower rungs: YAGNI fails because the user explicitly requested the measured improvements and current audit found missing evidence
 - Retained exceptions / ponytail triggers: paired compare is bounded at 50,000 `pairKey`; measured locally at 1.763 s / 54.06 MiB peak; archive JSONL or add a SQLite index above the cap. Streaming summary remains O(1) memory.
 - Current verified subgoal: G06 — evidence workflow integration accepted
-- Next minimal slice and acceptance check: G07 independent re-verification of exact negative probes and full release, then fresh acceptance and final telemetry checkpoint
+- Next minimal slice and acceptance check: fresh schema-v2 acceptance evidence, one clean strict release, truthful final telemetry, then G07 closure
 - Executable plan snapshot: `.harness/work/hre-001.passport.json`
 - Last validated plan snapshot/hash: `b7c4dd77bd69712521e74255ce5a55b12f3191be`; validator PASS after second read-only verifier completed
 - Measurement treatment IDs: baseline `legacy-unchecked` | treatment `harness-evidence-v1`
 - Metrics path/schema: `.harness/metrics/hre-001.jsonl` / schema 1
 - Global agent cap: 12
-- Active agent count: 1
+- Active agent count: 0
 - Delegation depth cap: 2
 - Compaction count: 2
 - Context threshold: 45% when visible
@@ -82,7 +82,7 @@
 | G04 | Исполняемый Goal validator проверяет DAG, ready waves, cap/depth, approval fields и конфликт writer ownership | G01 | 2 | worker: validator + scenario tests | medium | worker / terra-medium | done | `a5c3186` + `cbd111f`; 9 valid/invalid scenario tests PASS; verified-handoff correction accepted |
 | G05 | Benchmark runner выполняет минимум 20 детерминированных сценариев и сравнивает baseline/treatment без LLM-as-judge; реальные модельные запуски можно импортировать позднее | G02,G03,G04 | 3 | worker: benchmarks + fixtures + tests | medium | worker / terra-medium | done | `f12bc69` + `7e650b6`; 20 pairs; objective quality 4/20→20/20, defects/rework 16→0; tokens explicitly unknown; 5 tests + integrated 28 PASS |
 | G06 | Skills, state, templates и документация используют telemetry, freshness, validator и evidence gate; skills загружаются/сравниваются по явному treatment ID | G02,G03,G04,G05 | 4 | worker: skills/docs/templates | medium | worker / terra-medium; primary integration | done | `e3e6c11` + `7e19c38`; 28 tests, passport, benchmark, architecture, installer and postchange-full PASS; noisy duplicate removed |
-| G07 | Независимая correctness/security review, simplify review и полный strict release подтверждают родительский исход | G01-G06 | 5 | verifier read-only + primary | medium | verifier / sol-high | active | path-safety remediation committed and full gate passed; exact read-only re-probe active |
+| G07 | Независимая correctness/security review, simplify review и полный strict release подтверждают родительский исход | G01-G06 | 5 | verifier read-only + primary | medium | verifier / sol-high | active | independent exact re-probe PASS at `29cdb4c`; acceptance/telemetry closure pending |
 
 ## Волны, роли и ownership
 
@@ -114,7 +114,7 @@ Planned pool peak: 3 write-workers + primary; verifier запускается о
 | `/root/hre_g05_benchmark` | primary | G05 | harness_goal_worker | terra/medium | `.worktrees/g05`; benchmark-owned paths | done | initial scoring rejected; objective-oracle correction accepted and integrated; child quota 0 |
 | `/root/hre_g06_integration` | primary | G06 | harness_goal_worker | terra/medium | `.worktrees/g06`; skills/docs/templates/config paths | done | initial checkpoint corrected for explicit plan continuity and concise output; accepted and integrated; child quota 0 |
 | `/root/hre_g07_verifier` | primary | G07 | harness_goal_verifier | sol/high | read-only integrated tree | done | REJECTED with reproduced blocking findings; no writes; child quota 0 |
-| `/root/hre_g07_reverifier` | primary | G07 | harness_goal_verifier | sol/high | read-only integrated tree | orienting | re-probe commit `d993d4f`; no writes; child quota 0 |
+| `/root/hre_g07_reverifier` | primary | G07 | harness_goal_verifier | sol/high | read-only integrated tree | done | PASS at `29cdb4c`; 38 tests + strict release; no writes; child quota 0 |
 
 ## Task chain
 
@@ -158,6 +158,7 @@ Planned pool peak: 3 write-workers + primary; verifier запускается о
 | 2026-08-03 | G07 re-verifier registration | validator PASS; snapshot hash `fea96323726fae563b989d2130f31bc799e02a57` | second read-only verifier may start |
 | 2026-08-03 | G07 second independent audit | REJECT: canonical/metrics/worktree/owned paths allow Windows/backslash and `..` escape; P2 no-read test gap; P3 ponytail marker gap. All prior blockers closed; 35 tests and strict release PASS | narrow path normalization/test/comment remediation, then exact re-probe |
 | 2026-08-03 | G07 path-safety remediation | `d993d4f`; 38 tests; actual/template passports PASS; postchange full PASS | Windows/backslash/traversal declarations fail closed; segment-bound ownership, no-read regression, and measured `ponytail:` marker ready for exact re-probe |
+| 2026-08-03 | G07 exact independent re-probe | PASS at `29cdb4c`; focused 33 and full 38 tests; actual/template passports; benchmark; architecture; installer; diff-check; strict release; Git clean | all prior P1-P3 findings closed; proceed to fresh acceptance, truthful telemetry, and final closure |
 
 ## Передача
 
