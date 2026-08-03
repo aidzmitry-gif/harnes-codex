@@ -9,10 +9,14 @@ Only use commands from a profile maintained by a trusted project owner.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import subprocess
 import sys
-from pathlib import Path
+import time
+from datetime import datetime, timezone
+from fnmatch import fnmatch
+from pathlib import Path, PurePosixPath
 
 
 def root() -> Path:
@@ -31,6 +35,7 @@ def load(path: Path) -> dict:
 
 def save(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    data["schemaVersion"] = 2
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
@@ -48,8 +53,81 @@ def validate(data: dict) -> list[dict]:
             raise ValueError(f"{cid}: kind must be 'command' or 'manual'")
         if kind == "command" and not isinstance(criterion.get("command"), str):
             raise ValueError(f"{cid}: command criterion needs a command")
+        timeout = criterion.get("timeoutSeconds", 600)
+        if kind == "command" and (not isinstance(timeout, int) or isinstance(timeout, bool) or not 1 <= timeout <= 600):
+            raise ValueError(f"{cid}: timeoutSeconds must be an integer from 1 to 600")
         seen.add(cid)
     return criteria
+
+
+def now_utc() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def excluded(relative: PurePosixPath) -> bool:
+    parts = relative.parts
+    return (
+        any(part in {".git", ".worktrees", "graphify-out", "__pycache__", "secrets"} for part in parts)
+        or (len(parts) >= 2 and parts[:2] == (".harness", "acceptance"))
+        or (len(parts) >= 2 and parts[:2] == (".harness", "work"))
+        or (len(parts) >= 2 and parts[:2] == (".harness", "metrics"))
+        or (len(parts) >= 3 and parts[:3] == (".harness", "benchmarks", "runs"))
+        or any(fnmatch(part, ".env*") or part.endswith(".pyc") for part in parts)
+    )
+
+
+def digest_files(base: Path, names: list[str]) -> str:
+    digest = hashlib.sha256()
+    for name in sorted(names):
+        relative = PurePosixPath(name)
+        if excluded(relative):
+            continue
+        path = base.joinpath(*relative.parts)
+        if not path.is_file():
+            continue
+        digest.update(name.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(hashlib.sha256(path.read_bytes()).digest())
+    return digest.hexdigest()
+
+
+def git_output(*args: str) -> str:
+    return subprocess.run(
+        ["git", *args], cwd=root(), capture_output=True, text=True,
+        encoding="utf-8", errors="replace", check=True,
+    ).stdout
+
+
+def non_git_fingerprint() -> dict[str, str]:
+    try:
+        files = [path.relative_to(root()).as_posix() for path in root().rglob("*") if path.is_file()]
+        return {"algorithm": "sha256", "value": digest_files(root(), files), "status": "ok"}
+    except OSError:
+        return {"algorithm": "sha256", "value": "", "status": "unavailable"}
+
+
+def fingerprint() -> dict[str, str]:
+    """Return a deterministic safe project-state fingerprint, or explicit unavailability."""
+    try:
+        git_output("rev-parse", "--is-inside-work-tree")
+        try:
+            head = git_output("rev-parse", "HEAD").strip()
+        except subprocess.CalledProcessError:
+            head = "UNBORN"
+        tracked = [name for name in git_output("ls-files", "-z").split("\0") if name and not excluded(PurePosixPath(name))]
+        if tracked:
+            diff_args = ("diff", "--binary", "HEAD", "--", *tracked) if head != "UNBORN" else ("diff", "--cached", "--binary", "--", *tracked)
+            tracked_diff = hashlib.sha256(git_output(*diff_args).encode("utf-8")).hexdigest()
+        else:
+            tracked_diff = hashlib.sha256(b"").hexdigest()
+        untracked = [name for name in git_output("ls-files", "--others", "--exclude-standard", "-z").split("\0") if name and not excluded(PurePosixPath(name))]
+        content = digest_files(root(), untracked)
+        payload = json.dumps({"head": head, "trackedDiff": tracked_diff, "untracked": content}, sort_keys=True)
+        return {"algorithm": "sha256", "value": hashlib.sha256(payload.encode("utf-8")).hexdigest(), "status": "ok"}
+    except (OSError, subprocess.SubprocessError):
+        if (root() / ".git").exists():
+            return {"algorithm": "sha256", "value": "", "status": "unavailable"}
+        return non_git_fingerprint()
 
 
 def init(args: argparse.Namespace) -> int:
@@ -85,6 +163,9 @@ def prove(args: argparse.Namespace) -> int:
             if not criterion["evidence"]:
                 print("FAIL evidence must not be empty", file=sys.stderr)
                 return 2
+            criterion["checkedAt"] = now_utc()
+            criterion["durationMs"] = 0
+            criterion["fingerprint"] = fingerprint()
             save(target, data)
             print(f"PASS recorded evidence for {args.criterion}")
             return 0
@@ -95,14 +176,30 @@ def prove(args: argparse.Namespace) -> int:
 def evaluate(criterion: dict) -> tuple[bool, str]:
     if criterion["kind"] == "manual":
         evidence = str(criterion.get("evidence", "")).strip()
-        return bool(criterion.get("passes")) and bool(evidence), "manual evidence" if evidence else "missing manual evidence"
-    result = subprocess.run(
-        criterion["command"], shell=True, cwd=root(), capture_output=True,
-        text=True, timeout=600, encoding="utf-8", errors="replace",
-    )
-    criterion["passes"] = result.returncode == 0
-    output = (result.stdout or result.stderr).strip().splitlines()
-    criterion["evidence"] = f"auto: exit {result.returncode}; {output[-1][:160] if output else 'no output'}"
+        stored = criterion.get("fingerprint")
+        if not evidence:
+            return False, "missing manual evidence"
+        if not isinstance(stored, dict):
+            return False, "stale manual evidence: re-prove required"
+        current = fingerprint()
+        if stored.get("status") != "ok" or current.get("status") != "ok" or stored != current:
+            return False, "stale manual evidence: re-prove required"
+        return bool(criterion.get("passes")), "manual evidence"
+    started = time.monotonic()
+    criterion["checkedAt"] = now_utc()
+    criterion["fingerprint"] = fingerprint()
+    try:
+        result = subprocess.run(
+            criterion["command"], shell=True, cwd=root(), capture_output=True,
+            text=True, timeout=criterion.get("timeoutSeconds", 600), encoding="utf-8", errors="replace",
+        )
+        criterion["passes"] = result.returncode == 0
+        output = (result.stdout or result.stderr).strip().splitlines()
+        criterion["evidence"] = f"auto: exit {result.returncode}; {output[-1][:160] if output else 'no output'}"
+    except subprocess.TimeoutExpired:
+        criterion["passes"] = False
+        criterion["evidence"] = f"auto: timeout after {criterion.get('timeoutSeconds', 600)} seconds"
+    criterion["durationMs"] = max(0, round((time.monotonic() - started) * 1000))
     return criterion["passes"], criterion["evidence"]
 
 
