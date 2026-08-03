@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 
 CHAIN_STATUSES = {"planning", "approved", "running", "verifying", "awaiting-user-review", "complete", "blocked"}
@@ -12,6 +13,7 @@ SUBGOAL_STATUSES = {"planned", "ready", "running", "done", "blocked", "skipped"}
 AGENT_STATUSES = {"planned", "orienting", "active", "done", "blocked"}
 EXECUTABLE_CHAIN_STATUSES = {"approved", "running", "verifying", "awaiting-user-review", "complete"}
 AUTH_SCOPES = {"successor creation", "bounded continuation", "both"}
+BOUNDED_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:+/@-]{0,63}$")
 
 
 def validate_passport(passport: object) -> list[tuple[str, str]]:
@@ -75,6 +77,27 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
     plan_revision = chain.get("planRevision")
     if chain.get("status") in EXECUTABLE_CHAIN_STATUSES and chain.get("approvedPassportRevision") != plan_revision:
         fail("CHAIN_REVISION", "approvedPassportRevision must equal planRevision for executable status")
+    if chain.get("status") in EXECUTABLE_CHAIN_STATUSES:
+        for field in ("canonicalWorkItemPath", "baselineId", "treatmentId", "metricsPath"):
+            text(chain.get(field), f"chain.{field}")
+        canonical = chain.get("canonicalWorkItemPath")
+        if isinstance(canonical, str):
+            path = PurePosixPath(canonical)
+            if path.is_absolute() or ".." in path.parts or path.suffix.lower() != ".md":
+                fail("CHAIN_CONTINUITY", "chain.canonicalWorkItemPath must be a relative Markdown path without '..'")
+        baseline, treatment = chain.get("baselineId"), chain.get("treatmentId")
+        if not isinstance(baseline, str) or not BOUNDED_ID.fullmatch(baseline) or not isinstance(treatment, str) or not BOUNDED_ID.fullmatch(treatment):
+            fail("CHAIN_CONTINUITY", "chain baselineId and treatmentId must be bounded identifiers")
+        elif baseline == treatment:
+            fail("CHAIN_CONTINUITY", "chain baselineId and treatmentId must differ")
+        metrics_path = chain.get("metricsPath")
+        if isinstance(metrics_path, str):
+            path = PurePosixPath(metrics_path)
+            if path.is_absolute() or ".." in path.parts or path.suffix.lower() != ".jsonl" or path.parts[:2] != (".harness", "metrics"):
+                fail("CHAIN_CONTINUITY", "chain.metricsPath must be a relative .harness/metrics/*.jsonl path")
+        schema = chain.get("metricsSchemaVersion")
+        if isinstance(schema, bool) or schema != 1:
+            fail("CHAIN_CONTINUITY", "chain.metricsSchemaVersion must be integer 1")
 
     by_id: dict[str, dict] = {}
     for index, raw in enumerate(subgoals):
@@ -138,6 +161,10 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
 
     for identifier in sorted(by_id):
         visit(identifier)
+    if chain.get("status") == "complete":
+        unfinished = sorted(identifier for identifier, item in by_id.items() if item.get("status") not in {"done", "skipped"})
+        if unfinished:
+            fail("CHAIN_COMPLETE", "complete chain has unfinished subgoals: " + ", ".join(unfinished))
     verified = chain.get("currentVerifiedSubgoal")
     if (
         "currentVerifiedSubgoal" not in chain
@@ -175,9 +202,26 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
             if not isinstance(worktree, str) or not worktree.strip() or not isinstance(paths, list) or not paths or any(not isinstance(path, str) or not path for path in paths):
                 fail("WRITER_OWNERSHIP", f"writer {identifier or index} requires a worktree and owned paths")
             else:
-                active_writers.append((worktree.replace("/", "\\").rstrip("\\").lower(), [path.replace("/", "\\").rstrip("\\").lower() for path in paths], identifier or str(index)))
+                normalized_worktree = worktree.replace("/", "\\").rstrip("\\").lower()
+                normalized_paths = [path.replace("/", "\\").rstrip("\\").lower() for path in paths]
+                subgoal = by_id.get(item.get("subgoalId"), {})
+                expected_worktree = subgoal.get("worktree")
+                expected_paths = subgoal.get("ownedPaths")
+                normalized_expected = {
+                    path.replace("/", "\\").rstrip("\\").lower()
+                    for path in expected_paths if isinstance(path, str)
+                } if isinstance(expected_paths, list) else set()
+                paths_within_scope = all(
+                    any(path == root or path.startswith(root + "\\") for root in normalized_expected)
+                    for path in normalized_paths
+                )
+                if not isinstance(expected_worktree, str) or normalized_worktree != expected_worktree.replace("/", "\\").rstrip("\\").lower() or not paths_within_scope:
+                    fail("AGENT_OWNERSHIP", f"writer {identifier or index} must stay within its subgoal worktree and owned paths")
+                active_writers.append((normalized_worktree, normalized_paths, identifier or str(index)))
     if isinstance(chain.get("globalAgentCap"), int) and active_count > chain["globalAgentCap"]:
         fail("AGENT_CAP", "active and orienting agents exceed globalAgentCap")
+    if chain.get("status") == "complete" and active_count:
+        fail("CHAIN_COMPLETE", "complete chain cannot have active or orienting agents")
     for position, (worktree, paths, identifier) in enumerate(active_writers):
         for other_worktree, other_paths, other_identifier in active_writers[position + 1:]:
             if worktree == other_worktree:

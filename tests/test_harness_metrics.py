@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import harness_metrics as metrics
 
@@ -32,11 +33,19 @@ class HarnessMetricsTests(unittest.TestCase):
             metrics.validate_event(event(inputTokens=2))
         with self.assertRaisesRegex(ValueError, "requires"):
             metrics.validate_event(event(released=False, used=True))
+        unknown = metrics.summary([normalized])
+        self.assertIsNone(unknown["tokens"]["total"])
 
     def test_rejects_secret_and_multiline_identifiers(self):
         with self.assertRaisesRegex(ValueError, "secret-like"):
-            metrics.validate_event(event(runId="token=abc"))
-        with self.assertRaisesRegex(ValueError, "single-line"):
+            metrics.validate_event(event(runId="token:abc"))
+        with self.assertRaisesRegex(ValueError, "secret-like"):
+            metrics.validate_event(event(model="password:hunter2"))
+        with self.assertRaisesRegex(ValueError, "bounded identifier"):
+            metrics.validate_event(event(runId="transcript excerpt for alice@example.com"))
+        with self.assertRaisesRegex(ValueError, "bounded identifier"):
+            metrics.validate_event(event(runId="alice@example.com"))
+        with self.assertRaisesRegex(ValueError, "bounded identifier"):
             metrics.validate_event(event(pairKey="pair\n2"))
 
     def test_append_and_summary(self):
@@ -46,7 +55,7 @@ class HarnessMetricsTests(unittest.TestCase):
         try:
             metrics.append_record(path, metrics.normalize_event(event(), "2026-08-03T00:00:00Z"))
             metrics.append_record(path, metrics.normalize_event(event(runId="run-2", inputTokens=3, outputTokens=5, released=True, used=True), "2026-08-03T00:01:00Z"))
-            result = metrics.summary(metrics.load_records(path))
+            result = metrics.summary(metrics.iter_records(path))
         finally:
             path.unlink(missing_ok=True)
         self.assertEqual(result["runs"], 2)
@@ -65,6 +74,14 @@ class HarnessMetricsTests(unittest.TestCase):
         self.assertEqual(result["exclusions"]["missingTreatment"], 1)
         self.assertEqual(result["deltas"]["durationMs"]["mean"], -20.0)
         self.assertEqual(result["deltas"]["accepted"]["mean"], -1.0)
+
+    def test_compare_has_a_bounded_sqlite_upgrade_path(self):
+        records = [
+            metrics.normalize_event(event(pairKey="a", treatment="base"), "2026-08-03T00:00:00Z"),
+            metrics.normalize_event(event(runId="run-2", pairKey="b", treatment="base"), "2026-08-03T00:00:00Z"),
+        ]
+        with patch.object(metrics, "MAX_COMPARE_PAIR_KEYS", 1), self.assertRaisesRegex(ValueError, "SQLite index"):
+            metrics.compare(iter(records), "base", "new")
 
     def test_cli_rejects_malformed_jsonl(self):
         temporary = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)

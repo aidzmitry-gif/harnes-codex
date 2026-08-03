@@ -11,13 +11,18 @@
     "planRevision": 1,
     "approvedPassportRevision": 1,
     "approvalProvenance": "task",
+    "canonicalWorkItemPath": ".harness/work/hre-001.md",
     "checkoutWorktreePolicy": "isolated",
     "globalAgentCap": 2,
     "delegationDepthCap": 1,
     "standingChainAuthorization": "approved",
     "standingAuthorizationScope": "both",
     "currentVerifiedSubgoal": "G01",
-    "nextMinimalSliceAcceptance": "test"
+    "nextMinimalSliceAcceptance": "test",
+    "baselineId": "baseline",
+    "treatmentId": "treatment",
+    "metricsPath": ".harness/metrics/hre-001.jsonl",
+    "metricsSchemaVersion": 1
   },
   "subgoals": [
     {

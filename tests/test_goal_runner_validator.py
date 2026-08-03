@@ -10,7 +10,7 @@ from goal_runner_validator import validate_passport
 def valid_passport():
     return {
         "schemaVersion": 1,
-        "chain": {"chainId": "HRE-001", "projectRoot": "D:\\repo", "dataOwner": "team", "riskClass": "medium", "externalSideEffectBoundary": "local only", "parentOutcome": "validate", "status": "running", "planRevision": 1, "approvedPassportRevision": 1, "approvalProvenance": "task", "checkoutWorktreePolicy": "isolated", "globalAgentCap": 2, "delegationDepthCap": 1, "standingChainAuthorization": "approved", "standingAuthorizationScope": "both", "currentVerifiedSubgoal": "G01", "nextMinimalSliceAcceptance": "test"},
+        "chain": {"chainId": "HRE-001", "projectRoot": "D:\\repo", "dataOwner": "team", "riskClass": "medium", "externalSideEffectBoundary": "local only", "parentOutcome": "validate", "status": "running", "planRevision": 1, "approvedPassportRevision": 1, "approvalProvenance": "task", "canonicalWorkItemPath": ".harness/work/hre-001.md", "checkoutWorktreePolicy": "isolated", "globalAgentCap": 2, "delegationDepthCap": 1, "standingChainAuthorization": "approved", "standingAuthorizationScope": "both", "currentVerifiedSubgoal": "G01", "nextMinimalSliceAcceptance": "test", "baselineId": "baseline", "treatmentId": "treatment", "metricsPath": ".harness/metrics/hre-001.jsonl", "metricsSchemaVersion": 1},
         "subgoals": [
             {"id": "G01", "dependsOn": [], "wave": 1, "status": "done", "execution": "primary", "model": "terra", "worktree": None, "ownedPaths": []},
             {"id": "G02", "dependsOn": ["G01"], "wave": 2, "status": "ready", "execution": "subagent", "model": "terra", "worktree": "g02", "ownedPaths": ["x.py"]},
@@ -34,6 +34,14 @@ class GoalPassportValidationTests(unittest.TestCase):
         passport = valid_passport(); passport["chain"]["currentVerifiedSubgoal"] = None
         self.assert_code(passport, "CHAIN_VERIFIED")
 
+    def test_executable_plan_requires_measurement_continuity(self):
+        passport = valid_passport()
+        for field in ("canonicalWorkItemPath", "baselineId", "treatmentId", "metricsPath", "metricsSchemaVersion"):
+            passport["chain"].pop(field)
+        codes = [failure[0] for failure in validate_passport(passport)]
+        self.assertIn("CHAIN_CONTINUITY", codes)
+        self.assertIn("REQUIRED", codes)
+
     def test_duplicate_and_unknown_dependencies_are_rejected(self):
         passport = valid_passport(); passport["subgoals"][1]["dependsOn"] = ["missing", "missing"]
         self.assert_code(passport, "SUBGOAL_DEPENDS")
@@ -54,6 +62,18 @@ class GoalPassportValidationTests(unittest.TestCase):
     def test_writer_conflict_is_rejected(self):
         passport = valid_passport(); passport["agents"].append({"id": "a2", "subgoalId": "G02", "role": "worker", "depth": 1, "worktree": "g02", "ownedPaths": ["other.py"], "status": "orienting", "writer": True})
         self.assert_code(passport, "WRITER_CONFLICT")
+
+    def test_writer_must_match_subgoal_ownership(self):
+        passport = valid_passport(); passport["agents"][0].update({"worktree": "different", "ownedPaths": ["outside.py"]})
+        self.assert_code(passport, "AGENT_OWNERSHIP")
+
+    def test_writer_may_use_a_path_below_an_owned_root(self):
+        passport = valid_passport(); passport["subgoals"][1]["ownedPaths"] = ["src"]; passport["agents"][0]["ownedPaths"] = ["src/x.py"]
+        self.assertEqual([], validate_passport(passport))
+
+    def test_complete_chain_rejects_unfinished_subgoals(self):
+        passport = valid_passport(); passport["chain"]["status"] = "complete"; passport["agents"][0]["status"] = "done"
+        self.assert_code(passport, "CHAIN_COMPLETE")
 
     def test_check_cli_prints_one_pass_line(self):
         passport_file = Path(__file__).parent / "fixtures" / "valid_goal_passport.json"

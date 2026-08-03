@@ -11,11 +11,12 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from statistics import fmean
+from collections.abc import Iterable, Iterator
 from typing import Any
 
 
 SCHEMA_VERSION = 1
-MAX_IDENTIFIER_LENGTH = 256
+MAX_COMPARE_PAIR_KEYS = 50_000
 EVENT_FIELDS = (
     "runId", "pairKey", "chainId", "subgoalId", "treatment", "mode", "model",
     "reasoningEffort", "inputTokens", "outputTokens", "durationMs", "attempts",
@@ -35,7 +36,8 @@ COUNT_FIELDS = {
     "checksPassed", "checksFailed",
 }
 BOOL_FIELDS = {"accepted", "released", "used"}
-SECRET_PATTERN = re.compile(r"(?i)(?:bearer\s+\S+|(?:api[_-]?key|token|secret|password)\s*=)")
+IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/+-]{0,255}$")
+SECRET_PATTERN = re.compile(r"(?i)(?:bearer(?:[:=]|\s)|(?:api[_-]?key|token|secret|password)\s*[:=])")
 
 
 def _fail(message: str) -> None:
@@ -58,10 +60,8 @@ def validate_event(event: Any) -> dict[str, Any]:
         value = normalized[field]
         if value is None and field not in REQUIRED_FIELDS:
             continue
-        if not isinstance(value, str) or not value or len(value) > MAX_IDENTIFIER_LENGTH:
-            _fail(f"{field} must be a non-empty string no longer than {MAX_IDENTIFIER_LENGTH} characters")
-        if "\n" in value or "\r" in value:
-            _fail(f"{field} must be single-line")
+        if not isinstance(value, str) or not IDENTIFIER_PATTERN.fullmatch(value):
+            _fail(f"{field} must be a bounded identifier using only ASCII letters, digits, '.', '_', ':', '/', '+', or '-'")
         if SECRET_PATTERN.search(value):
             _fail(f"{field} contains a secret-like value")
     for field in COUNT_FIELDS:
@@ -126,49 +126,68 @@ def append_record(path: Path, record: dict[str, Any]) -> None:
         os.close(descriptor)
 
 
-def load_records(path: Path) -> list[dict[str, Any]]:
-    records: list[dict[str, Any]] = []
+def iter_records(path: Path) -> Iterator[dict[str, Any]]:
+    """Yield validated JSONL records without materializing the telemetry file."""
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()
+        handle = path.open("r", encoding="utf-8")
     except OSError as exc:
         raise ValueError(f"cannot read telemetry file: {exc}") from exc
-    for number, line in enumerate(lines, 1):
-        if not line.strip():
-            _fail(f"line {number}: blank lines are not valid JSONL records")
-        try:
-            record = json.loads(line)
-            records.append(validate_record(record))
-        except (json.JSONDecodeError, ValueError) as exc:
-            raise ValueError(f"line {number}: {exc}") from exc
-    return records
+    with handle:
+        for number, line in enumerate(handle, 1):
+            if not line.strip():
+                _fail(f"line {number}: blank lines are not valid JSONL records")
+            try:
+                yield validate_record(json.loads(line))
+            except (json.JSONDecodeError, ValueError) as exc:
+                raise ValueError(f"line {number}: {exc}") from exc
 
 
-def _rate(values: list[bool]) -> float | None:
-    return None if not values else sum(values) / len(values)
+def load_records(path: Path) -> list[dict[str, Any]]:
+    """Compatibility helper for callers that explicitly need a materialized list."""
+    return list(iter_records(path))
 
 
-def summary(records: list[dict[str, Any]]) -> dict[str, Any]:
-    known_tokens = [record for record in records if record["inputTokens"] is not None]
-    releases = [record["released"] for record in records if record["released"] is not None]
-    usages = [record["used"] for record in records if record["used"] is not None]
+def summary(records: Iterable[dict[str, Any]]) -> dict[str, Any]:
+    runs = accepted = attempts = checks_failed = checks_passed = defects = rework = duration = 0
+    token_known = token_input = token_output = 0
+    release_known = released = usage_known = used = 0
+    for record in records:
+        runs += 1
+        accepted += int(record["accepted"])
+        attempts += record["attempts"]
+        checks_failed += record["checksFailed"]
+        checks_passed += record["checksPassed"]
+        defects += record["escapedDefects"]
+        rework += record["reworkCount"]
+        duration += record["durationMs"]
+        if record["inputTokens"] is not None:
+            token_known += 1
+            token_input += record["inputTokens"]
+            token_output += record["outputTokens"]
+        if record["released"] is not None:
+            release_known += 1
+            released += int(record["released"])
+        if record["used"] is not None:
+            usage_known += 1
+            used += int(record["used"])
     return {
-        "accepted": sum(record["accepted"] for record in records),
-        "attemptsTotal": sum(record["attempts"] for record in records),
-        "checks": {"failed": sum(record["checksFailed"] for record in records), "passed": sum(record["checksPassed"] for record in records)},
-        "durationMsMean": fmean([record["durationMs"] for record in records]) if records else None,
-        "escapedDefects": sum(record["escapedDefects"] for record in records),
-        "passRate": _rate([record["accepted"] for record in records]),
-        "release": {"known": len(releases), "rate": _rate(releases), "released": sum(releases)},
-        "reworkTotal": sum(record["reworkCount"] for record in records),
-        "runs": len(records),
+        "accepted": accepted,
+        "attemptsTotal": attempts,
+        "checks": {"failed": checks_failed, "passed": checks_passed},
+        "durationMsMean": duration / runs if runs else None,
+        "escapedDefects": defects,
+        "passRate": accepted / runs if runs else None,
+        "release": {"known": release_known, "rate": released / release_known if release_known else None, "released": released},
+        "reworkTotal": rework,
+        "runs": runs,
         "tokens": {
-            "input": sum(record["inputTokens"] for record in known_tokens),
-            "knownCoverage": len(known_tokens) / len(records) if records else None,
-            "knownRuns": len(known_tokens),
-            "output": sum(record["outputTokens"] for record in known_tokens),
-            "total": sum(record["inputTokens"] + record["outputTokens"] for record in known_tokens),
+            "input": token_input if token_known else None,
+            "knownCoverage": token_known / runs if runs else None,
+            "knownRuns": token_known,
+            "output": token_output if token_known else None,
+            "total": token_input + token_output if token_known else None,
         },
-        "usage": {"known": len(usages), "rate": _rate(usages), "used": sum(usages)},
+        "usage": {"known": usage_known, "rate": used / usage_known if usage_known else None, "used": used},
     }
 
 
@@ -186,12 +205,15 @@ def _mean_delta(pairs: list[tuple[dict[str, Any], dict[str, Any]]], field: str, 
     return {"mean": fmean(values) if values else None, "pairs": len(values)}
 
 
-def compare(records: list[dict[str, Any]], baseline_id: str, treatment_id: str) -> dict[str, Any]:
+def compare(records: Iterable[dict[str, Any]], baseline_id: str, treatment_id: str) -> dict[str, Any]:
     if baseline_id == treatment_id:
         _fail("baseline and treatment must differ")
     grouped: dict[str, dict[str, list[dict[str, Any]]]] = {}
     for record in records:
-        bucket = grouped.setdefault(record["pairKey"], {baseline_id: [], treatment_id: []})
+        pair_key = record["pairKey"]
+        if pair_key not in grouped and len(grouped) >= MAX_COMPARE_PAIR_KEYS:
+            _fail(f"compare supports at most {MAX_COMPARE_PAIR_KEYS} pair keys in memory; archive the JSONL or add a SQLite index")
+        bucket = grouped.setdefault(pair_key, {baseline_id: [], treatment_id: []})
         if record["treatment"] in bucket:
             bucket[record["treatment"]].append(record)
     pairs: list[tuple[dict[str, Any], dict[str, Any]]] = []
@@ -250,9 +272,9 @@ def main() -> int:
             append_record(args.file, normalized)
             _dump(normalized)
         elif args.command == "summary":
-            _dump(summary(load_records(args.file)))
+            _dump(summary(iter_records(args.file)))
         else:
-            _dump(compare(load_records(args.file), args.baseline, args.treatment))
+            _dump(compare(iter_records(args.file), args.baseline, args.treatment))
     except (OSError, json.JSONDecodeError, ValueError) as exc:
         print(json.dumps({"error": str(exc)}, sort_keys=True, separators=(",", ":")), file=sys.stderr)
         return 2

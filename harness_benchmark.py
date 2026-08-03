@@ -44,7 +44,7 @@ def _event(**updates: Any) -> dict[str, Any]:
 def _passport() -> dict[str, Any]:
     return {
         "schemaVersion": 1,
-        "chain": {"chainId": "benchmark", "projectRoot": "D:\\benchmark", "dataOwner": "local", "riskClass": "low", "externalSideEffectBoundary": "none", "parentOutcome": "test", "status": "running", "planRevision": 1, "approvedPassportRevision": 1, "approvalProvenance": "fixture", "checkoutWorktreePolicy": "isolated", "globalAgentCap": 2, "delegationDepthCap": 1, "standingChainAuthorization": "approved", "standingAuthorizationScope": "both", "currentVerifiedSubgoal": "G01", "nextMinimalSliceAcceptance": "test"},
+        "chain": {"chainId": "benchmark", "projectRoot": "D:\\benchmark", "dataOwner": "local", "riskClass": "low", "externalSideEffectBoundary": "none", "parentOutcome": "test", "status": "running", "planRevision": 1, "approvedPassportRevision": 1, "approvalProvenance": "fixture", "canonicalWorkItemPath": ".harness/work/benchmark.md", "checkoutWorktreePolicy": "isolated", "globalAgentCap": 2, "delegationDepthCap": 1, "standingChainAuthorization": "approved", "standingAuthorizationScope": "both", "currentVerifiedSubgoal": "G01", "nextMinimalSliceAcceptance": "test", "baselineId": "baseline", "treatmentId": "treatment", "metricsPath": ".harness/metrics/benchmark.jsonl", "metricsSchemaVersion": 1},
         "subgoals": [
             {"id": "G01", "dependsOn": [], "wave": 1, "status": "done", "execution": "primary", "model": "terra", "worktree": None, "ownedPaths": []},
             {"id": "G02", "dependsOn": ["G01"], "wave": 2, "status": "ready", "execution": "subagent", "model": "terra", "worktree": "g02", "ownedPaths": ["x.py"]},
@@ -145,6 +145,8 @@ def run_fixture(path: Path) -> dict[str, Any]:
         for mode in MODES:
             started = time.monotonic()
             result = _run(scenario, mode)
+            if result != scenario["expected"][mode]:
+                raise ValueError(f"scenario {scenario['id']} {mode} regression mismatch")
             outcomes[mode] = result
             verdicts[mode]["accepted" if result else "rejected"] += 1
             duration = max(0, round((time.monotonic() - started) * 1000))

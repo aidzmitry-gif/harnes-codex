@@ -19,6 +19,14 @@ from fnmatch import fnmatch
 from pathlib import Path, PurePosixPath
 
 
+SENSITIVE_DIRECTORIES = {".ssh", "credential", "credentials", "secret", "secrets"}
+SENSITIVE_FILE_PATTERNS = (
+    ".env*", "*.key", "*.pem", "*.p12", "*.pfx", "id_rsa*", "id_ed25519*",
+    "credentials.json", "credentials-*.json", "*_credentials.json", "service-account*.json",
+    "secret.json", "secrets.json",
+)
+
+
 def root() -> Path:
     return Path(__file__).resolve().parent
 
@@ -51,8 +59,8 @@ def validate(data: dict) -> list[dict]:
             raise ValueError("each criterion needs a unique non-empty id")
         if kind not in ("command", "manual"):
             raise ValueError(f"{cid}: kind must be 'command' or 'manual'")
-        if kind == "command" and not isinstance(criterion.get("command"), str):
-            raise ValueError(f"{cid}: command criterion needs a command")
+        if kind == "command" and (not isinstance(criterion.get("command"), str) or not criterion["command"].strip()):
+            raise ValueError(f"{cid}: command criterion needs a non-empty command")
         timeout = criterion.get("timeoutSeconds", 600)
         if kind == "command" and (not isinstance(timeout, int) or isinstance(timeout, bool) or not 1 <= timeout <= 600):
             raise ValueError(f"{cid}: timeoutSeconds must be an integer from 1 to 600")
@@ -65,29 +73,40 @@ def now_utc() -> str:
 
 
 def excluded(relative: PurePosixPath) -> bool:
-    parts = relative.parts
+    parts = tuple(part.lower() for part in relative.parts)
+    name = parts[-1] if parts else ""
     return (
-        any(part in {".git", ".worktrees", "graphify-out", "__pycache__", "secrets"} for part in parts)
+        any(part in {".git", ".worktrees", "graphify-out", "__pycache__"} | SENSITIVE_DIRECTORIES for part in parts)
         or (len(parts) >= 2 and parts[:2] == (".harness", "acceptance"))
-        or (len(parts) >= 2 and parts[:2] == (".harness", "work"))
+        or (len(parts) >= 2 and parts[:2] == (".harness", "work") and not name.endswith(".passport.json"))
         or (len(parts) >= 2 and parts[:2] == (".harness", "metrics"))
         or (len(parts) >= 3 and parts[:3] == (".harness", "benchmarks", "runs"))
-        or any(fnmatch(part, ".env*") or part.endswith(".pyc") for part in parts)
+        or name.endswith(".pyc")
+        or any(fnmatch(name, pattern) for pattern in SENSITIVE_FILE_PATTERNS)
     )
 
 
 def digest_files(base: Path, names: list[str]) -> str:
     digest = hashlib.sha256()
+    base_resolved = base.resolve()
     for name in sorted(names):
         relative = PurePosixPath(name)
         if excluded(relative):
             continue
         path = base.joinpath(*relative.parts)
-        if not path.is_file():
-            continue
         digest.update(name.encode("utf-8"))
         digest.update(b"\0")
-        digest.update(hashlib.sha256(path.read_bytes()).digest())
+        if path.is_symlink():
+            digest.update(b"SYMLINK")
+            continue
+        if not path.exists():
+            digest.update(b"MISSING")
+            continue
+        resolved = path.resolve(strict=True)
+        if not resolved.is_relative_to(base_resolved) or not resolved.is_file():
+            digest.update(b"UNSAFE")
+            continue
+        digest.update(hashlib.sha256(resolved.read_bytes()).digest())
     return digest.hexdigest()
 
 
@@ -110,19 +129,24 @@ def fingerprint() -> dict[str, str]:
     """Return a deterministic safe project-state fingerprint, or explicit unavailability."""
     try:
         git_output("rev-parse", "--is-inside-work-tree")
-        try:
-            head = git_output("rev-parse", "HEAD").strip()
-        except subprocess.CalledProcessError:
-            head = "UNBORN"
-        tracked = [name for name in git_output("ls-files", "-z").split("\0") if name and not excluded(PurePosixPath(name))]
-        if tracked:
-            diff_args = ("diff", "--binary", "HEAD", "--", *tracked) if head != "UNBORN" else ("diff", "--cached", "--binary", "--", *tracked)
-            tracked_diff = hashlib.sha256(git_output(*diff_args).encode("utf-8")).hexdigest()
-        else:
-            tracked_diff = hashlib.sha256(b"").hexdigest()
+        index_digest = hashlib.sha256()
+        for row in git_output("ls-files", "-s", "-z").split("\0"):
+            if not row or "\t" not in row:
+                continue
+            metadata, name = row.split("\t", 1)
+            if excluded(PurePosixPath(name)):
+                continue
+            index_digest.update(metadata.encode("utf-8"))
+            index_digest.update(b"\t")
+            index_digest.update(name.encode("utf-8"))
+            index_digest.update(b"\0")
+        changed = [name for name in git_output("diff", "--name-only", "-z").split("\0") if name and not excluded(PurePosixPath(name))]
         untracked = [name for name in git_output("ls-files", "--others", "--exclude-standard", "-z").split("\0") if name and not excluded(PurePosixPath(name))]
-        content = digest_files(root(), untracked)
-        payload = json.dumps({"head": head, "trackedDiff": tracked_diff, "untracked": content}, sort_keys=True)
+        payload = json.dumps({
+            "index": index_digest.hexdigest(),
+            "worktree": digest_files(root(), changed),
+            "untracked": digest_files(root(), untracked),
+        }, sort_keys=True)
         return {"algorithm": "sha256", "value": hashlib.sha256(payload.encode("utf-8")).hexdigest(), "status": "ok"}
     except (OSError, subprocess.SubprocessError):
         if (root() / ".git").exists():

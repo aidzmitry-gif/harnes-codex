@@ -4,6 +4,7 @@ import copy
 import json
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -51,9 +52,17 @@ class HarnessBenchmarkTests(unittest.TestCase):
         self.assertEqual(0.8, report["comparison"]["deltas"]["usage"]["mean"])
 
     def test_expected_contract_improvement_mismatch_is_caught(self):
-        scenario = copy.deepcopy(harness_benchmark.load_fixture(FIXTURE)[1])
-        scenario["expected"]["treatment"] = True
-        self.assertFalse(harness_benchmark._run(scenario, "treatment") == scenario["expected"]["treatment"])
+        fixture = json.loads(FIXTURE.read_text(encoding="utf-8"))
+        fixture["scenarios"][1]["expected"]["treatment"] = True
+        temporary = tempfile.NamedTemporaryFile(suffix=".json", delete=False)
+        path = Path(temporary.name)
+        temporary.close()
+        try:
+            path.write_text(json.dumps(fixture), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "regression mismatch"):
+                harness_benchmark.run_fixture(path)
+        finally:
+            path.unlink(missing_ok=True)
 
     def test_two_runs_have_equal_non_time_logical_results(self):
         self.assertEqual(logical(harness_benchmark.run_fixture(FIXTURE)), logical(harness_benchmark.run_fixture(FIXTURE)))

@@ -60,7 +60,7 @@ python .\harness_metrics.py record --file .harness\metrics\<chain>.jsonl --from 
 python .\harness_metrics.py compare --file .harness\metrics\<chain>.jsonl --baseline baseline --treatment treatment
 ```
 
-Сравнение имеет смысл только при валидных парах. Локальный benchmark — регрессионный оракул общей семантики качества, а не доказательство экономии токенов в реальных проектах или статистической значимости:
+Сравнение имеет смысл только при валидных парах. Текущий in-memory compare ограничен 50 000 `pairKey`: локальный замер HRE-001 обработал этот предел за 1,763 с с пиком 54,06 MiB; при превышении архивируйте JSONL либо переходите на SQLite-индекс. Локальный benchmark — регрессионный оракул общей семантики качества, а не доказательство экономии токенов в реальных проектах или статистической значимости:
 
 ```powershell
 python .\harness_benchmark.py --fixture .\tests\fixtures\hre-001-benchmark.json

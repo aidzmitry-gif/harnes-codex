@@ -1,5 +1,6 @@
 import argparse
 import unittest
+from pathlib import PurePosixPath
 from unittest.mock import patch
 
 import acceptance_gate
@@ -71,13 +72,31 @@ class AcceptanceGateTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             acceptance_gate.validate({"criteria": [self.command("echo ok", timeoutSeconds=0)]})
 
+    def test_empty_command_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "non-empty command"):
+            acceptance_gate.validate({"criteria": [self.command("   ")]})
+
+    def test_sensitive_paths_are_excluded_but_passports_are_relevant(self):
+        for name in (".env.local", "secrets/key", "credentials.json", ".ssh/id_rsa", "config/private.pem"):
+            self.assertTrue(acceptance_gate.excluded(PurePosixPath(name)), name)
+        self.assertTrue(acceptance_gate.excluded(PurePosixPath(".harness/work/notes.md")))
+        self.assertFalse(acceptance_gate.excluded(PurePosixPath(".harness/work/goal.passport.json")))
+        self.assertFalse(acceptance_gate.excluded(PurePosixPath("src/credential_validator.py")))
+
     @patch("acceptance_gate.git_output")
-    def test_git_fingerprint_never_reads_sensitive_or_evidence_paths(self, mocked_git):
-        mocked_git.side_effect = ["true\n", "head\n", "safe.txt\0.env\0.harness/acceptance/a.json\0secrets/key\0", "", "new.txt\0.env.local\0"]
-        with patch("acceptance_gate.digest_files", return_value="content"):
-            acceptance_gate.fingerprint()
-        diff_call = mocked_git.call_args_list[3].args
-        self.assertEqual(("diff", "--binary", "HEAD", "--", "safe.txt"), diff_call)
+    def test_fingerprint_ignores_evidence_only_commits_but_tracks_passport(self, mocked_git):
+        stable = "100644 aaa 0\tsafe.txt\0"
+        excluded_before = stable + "100644 old 0\t.harness/acceptance/a.json\0"
+        excluded_after = stable + "100644 new 0\t.harness/acceptance/a.json\0"
+        passport_after = stable + "100644 plan 0\t.harness/work/goal.passport.json\0"
+        mocked_git.side_effect = [
+            "true\n", excluded_before, "", "",
+            "true\n", excluded_after, "", "",
+            "true\n", passport_after, "", "",
+        ]
+        before = acceptance_gate.fingerprint()
+        self.assertEqual(before, acceptance_gate.fingerprint())
+        self.assertNotEqual(before, acceptance_gate.fingerprint())
 
     @patch("pathlib.Path.exists", return_value=True)
     @patch("acceptance_gate.git_output", side_effect=OSError)
