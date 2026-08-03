@@ -49,7 +49,7 @@
 - Approved passport revision: 1
 - Approval provenance: task `019fbcf5-d20e-74b3-ac9d-5ca89a78f462`; user message `Подтверждаю HRE-001 revision 1.`; 2026-08-03 Europe/Minsk
 - Primary task ID: `019fbcf5-d20e-74b3-ac9d-5ca89a78f462`
-- Current task ID: `019fbcf5-d20e-74b3-ac9d-5ca89a78f462`
+- Current task ID: `019fc99a-4ee0-78a1-a343-11390bf84729`
 - Checkout/worktree policy: primary serializes bootstrap; after baseline, independent workers use isolated clean worktrees
 - Commit policy: isolated-worker-allowed; primary integrates and creates parent checkpoints; no push
 - Integration branch/worktree: current root after G01 baseline; dedicated worker worktrees afterward
@@ -120,7 +120,8 @@ Planned pool peak: 3 write-workers + primary; verifier запускается о
 
 | Seq | Task ID | Title | Purpose | Status | Verified successor | Archive status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 01 | `019fbcf5-d20e-74b3-ac9d-5ca89a78f462` | HRE-001 · 01 · Evidence efficiency | parent plan and orchestration | active | n/a | keep |
+| 01 | `019fbcf5-d20e-74b3-ac9d-5ca89a78f462` | HRE-001 · 01 · Evidence efficiency | parent plan and orchestration | idle-pending-review | `019fc99a-4ee0-78a1-a343-11390bf84729` verified | keep |
+| 02 | `019fc99a-4ee0-78a1-a343-11390bf84729` | HRE-001 · H02 · Acceptance closure | fresh acceptance, telemetry and G07 closure | active | canonical context/objective/state/boundary acknowledged | keep |
 
 ## Decisions and plan revisions
 
