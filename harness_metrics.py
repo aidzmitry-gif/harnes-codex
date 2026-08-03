@@ -16,6 +16,7 @@ from typing import Any
 
 
 SCHEMA_VERSION = 1
+# ponytail: measured at 50,000 pair keys (1.763 s / 54.06 MiB); above this archive JSONL or add a SQLite index.
 MAX_COMPARE_PAIR_KEYS = 50_000
 EVENT_FIELDS = (
     "runId", "pairKey", "chainId", "subgoalId", "treatment", "mode", "model",

@@ -71,6 +71,31 @@ class GoalPassportValidationTests(unittest.TestCase):
         passport = valid_passport(); passport["subgoals"][1]["ownedPaths"] = ["src"]; passport["agents"][0]["ownedPaths"] = ["src/x.py"]
         self.assertEqual([], validate_passport(passport))
 
+    def test_chain_paths_must_be_normalized_and_stay_in_harness_roots(self):
+        invalid = (
+            ("canonicalWorkItemPath", "README.md"),
+            ("canonicalWorkItemPath", r"C:\outside\goal.md"),
+            ("canonicalWorkItemPath", r".harness/work\..\..\outside.md"),
+            ("metricsPath", "../outside.jsonl"),
+            ("metricsPath", r".harness\metrics\runs.jsonl"),
+        )
+        for field, value in invalid:
+            with self.subTest(field=field, value=value):
+                passport = valid_passport(); passport["chain"][field] = value
+                self.assert_code(passport, "PATH_SAFETY")
+
+    def test_subgoal_and_agent_declarations_reject_path_escape(self):
+        mutations = (
+            lambda passport: passport["subgoals"][1].update({"worktree": "../outside"}),
+            lambda passport: passport["subgoals"][1].update({"ownedPaths": ["../outside.py"]}),
+            lambda passport: passport["agents"][0].update({"ownedPaths": ["src/../outside.py"]}),
+            lambda passport: passport["agents"][0].update({"worktree": r"C:\outside"}),
+        )
+        for mutate in mutations:
+            with self.subTest(mutation=mutate):
+                passport = valid_passport(); mutate(passport)
+                self.assert_code(passport, "PATH_SAFETY")
+
     def test_complete_chain_rejects_unfinished_subgoals(self):
         passport = valid_passport(); passport["chain"]["status"] = "complete"; passport["agents"][0]["status"] = "done"
         self.assert_code(passport, "CHAIN_COMPLETE")

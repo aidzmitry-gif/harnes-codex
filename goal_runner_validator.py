@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 import sys
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 
 CHAIN_STATUSES = {"planning", "approved", "running", "verifying", "awaiting-user-review", "complete", "blocked"}
@@ -34,6 +34,32 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
             fail("REQUIRED", f"{name} must be a nonempty string")
             return False
         return True
+
+    def portable_relative_path(
+        value: object,
+        name: str,
+        *,
+        required_prefix: tuple[str, ...] = (),
+        suffix: str | None = None,
+    ) -> tuple[str, ...] | None:
+        """Validate a normalized, repository-relative path and return comparable parts."""
+        if not isinstance(value, str) or not value.strip():
+            return None
+        if value != value.strip() or "\\" in value or value.startswith("/") or re.match(r"^[A-Za-z]:", value):
+            fail("PATH_SAFETY", f"{name} must be a normalized portable relative path")
+            return None
+        raw_parts = value.split("/")
+        if any(part in {"", ".", ".."} for part in raw_parts):
+            fail("PATH_SAFETY", f"{name} must not contain empty, current, or parent path segments")
+            return None
+        parts = tuple(part.lower() for part in raw_parts)
+        if required_prefix and parts[:len(required_prefix)] != required_prefix:
+            fail("PATH_SAFETY", f"{name} must stay under {'/'.join(required_prefix)}")
+            return None
+        if suffix and not parts[-1].endswith(suffix):
+            fail("PATH_SAFETY", f"{name} must end with {suffix}")
+            return None
+        return parts
 
     root = mapping(passport, "passport")
     if root is None:
@@ -82,9 +108,12 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
             text(chain.get(field), f"chain.{field}")
         canonical = chain.get("canonicalWorkItemPath")
         if isinstance(canonical, str):
-            path = PurePosixPath(canonical)
-            if path.is_absolute() or ".." in path.parts or path.suffix.lower() != ".md":
-                fail("CHAIN_CONTINUITY", "chain.canonicalWorkItemPath must be a relative Markdown path without '..'")
+            portable_relative_path(
+                canonical,
+                "chain.canonicalWorkItemPath",
+                required_prefix=(".harness", "work"),
+                suffix=".md",
+            )
         baseline, treatment = chain.get("baselineId"), chain.get("treatmentId")
         if not isinstance(baseline, str) or not BOUNDED_ID.fullmatch(baseline) or not isinstance(treatment, str) or not BOUNDED_ID.fullmatch(treatment):
             fail("CHAIN_CONTINUITY", "chain baselineId and treatmentId must be bounded identifiers")
@@ -92,9 +121,12 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
             fail("CHAIN_CONTINUITY", "chain baselineId and treatmentId must differ")
         metrics_path = chain.get("metricsPath")
         if isinstance(metrics_path, str):
-            path = PurePosixPath(metrics_path)
-            if path.is_absolute() or ".." in path.parts or path.suffix.lower() != ".jsonl" or path.parts[:2] != (".harness", "metrics"):
-                fail("CHAIN_CONTINUITY", "chain.metricsPath must be a relative .harness/metrics/*.jsonl path")
+            portable_relative_path(
+                metrics_path,
+                "chain.metricsPath",
+                required_prefix=(".harness", "metrics"),
+                suffix=".jsonl",
+            )
         schema = chain.get("metricsSchemaVersion")
         if isinstance(schema, bool) or schema != 1:
             fail("CHAIN_CONTINUITY", "chain.metricsSchemaVersion must be integer 1")
@@ -125,8 +157,13 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
             fail("SUBGOAL_MODEL", f"subgoals[{index}].model is invalid")
         if "worktree" not in item or item.get("worktree") is not None and not isinstance(item.get("worktree"), str):
             fail("SUBGOAL_WORKTREE", f"subgoals[{index}].worktree must be string or null")
+        elif isinstance(item.get("worktree"), str):
+            portable_relative_path(item["worktree"], f"subgoals[{index}].worktree")
         if not isinstance(item.get("ownedPaths"), list) or any(not isinstance(path, str) or not path for path in item.get("ownedPaths", [])):
             fail("SUBGOAL_PATHS", f"subgoals[{index}].ownedPaths must be an array of nonempty strings")
+        elif isinstance(item.get("ownedPaths"), list):
+            for path_index, path in enumerate(item["ownedPaths"]):
+                portable_relative_path(path, f"subgoals[{index}].ownedPaths[{path_index}]")
 
     def dependencies(item: dict) -> list[str]:
         return item.get("dependsOn") if isinstance(item.get("dependsOn"), list) else []
@@ -195,6 +232,13 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
             fail("AGENT_STATUS", f"agents[{index}].status is invalid")
         if not isinstance(item.get("writer"), bool):
             fail("AGENT_WRITER", f"agents[{index}].writer must be boolean")
+        agent_worktree = item.get("worktree")
+        if isinstance(agent_worktree, str):
+            portable_relative_path(agent_worktree, f"agents[{index}].worktree")
+        agent_paths = item.get("ownedPaths")
+        if isinstance(agent_paths, list):
+            for path_index, path in enumerate(agent_paths):
+                portable_relative_path(path, f"agents[{index}].ownedPaths[{path_index}]")
         if item.get("status") in {"orienting", "active"}:
             active_count += 1
         if item.get("writer") and item.get("status") in {"orienting", "active"}:
@@ -202,22 +246,27 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
             if not isinstance(worktree, str) or not worktree.strip() or not isinstance(paths, list) or not paths or any(not isinstance(path, str) or not path for path in paths):
                 fail("WRITER_OWNERSHIP", f"writer {identifier or index} requires a worktree and owned paths")
             else:
-                normalized_worktree = worktree.replace("/", "\\").rstrip("\\").lower()
-                normalized_paths = [path.replace("/", "\\").rstrip("\\").lower() for path in paths]
+                normalized_worktree = portable_relative_path(worktree, f"agents[{index}].worktree")
+                normalized_paths = [portable_relative_path(path, f"agents[{index}].ownedPaths[{path_index}]") for path_index, path in enumerate(paths)]
                 subgoal = by_id.get(item.get("subgoalId"), {})
                 expected_worktree = subgoal.get("worktree")
                 expected_paths = subgoal.get("ownedPaths")
-                normalized_expected = {
-                    path.replace("/", "\\").rstrip("\\").lower()
-                    for path in expected_paths if isinstance(path, str)
-                } if isinstance(expected_paths, list) else set()
-                paths_within_scope = all(
-                    any(path == root or path.startswith(root + "\\") for root in normalized_expected)
+                normalized_expected_worktree = portable_relative_path(expected_worktree, f"subgoals[{item.get('subgoalId')}].worktree")
+                normalized_expected = [
+                    portable_relative_path(path, f"subgoals[{item.get('subgoalId')}].ownedPaths[{path_index}]")
+                    for path_index, path in enumerate(expected_paths)
+                ] if isinstance(expected_paths, list) else []
+                paths_within_scope = bool(normalized_paths) and all(
+                    path is not None and any(
+                        root is not None and (path == root or path[:len(root)] == root)
+                        for root in normalized_expected
+                    )
                     for path in normalized_paths
                 )
-                if not isinstance(expected_worktree, str) or normalized_worktree != expected_worktree.replace("/", "\\").rstrip("\\").lower() or not paths_within_scope:
+                if normalized_worktree is None or normalized_worktree != normalized_expected_worktree or not paths_within_scope:
                     fail("AGENT_OWNERSHIP", f"writer {identifier or index} must stay within its subgoal worktree and owned paths")
-                active_writers.append((normalized_worktree, normalized_paths, identifier or str(index)))
+                if normalized_worktree is not None:
+                    active_writers.append(("/".join(normalized_worktree), ["/".join(path) for path in normalized_paths if path is not None], identifier or str(index)))
     if isinstance(chain.get("globalAgentCap"), int) and active_count > chain["globalAgentCap"]:
         fail("AGENT_CAP", "active and orienting agents exceed globalAgentCap")
     if chain.get("status") == "complete" and active_count:

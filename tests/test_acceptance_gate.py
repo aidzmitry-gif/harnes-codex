@@ -83,6 +83,12 @@ class AcceptanceGateTests(unittest.TestCase):
         self.assertFalse(acceptance_gate.excluded(PurePosixPath(".harness/work/goal.passport.json")))
         self.assertFalse(acceptance_gate.excluded(PurePosixPath("src/credential_validator.py")))
 
+    def test_sensitive_files_are_never_read_for_fingerprinting(self):
+        sensitive = [".env.local", "secrets/key", "credentials.json", ".ssh/id_rsa", "config/private.pem"]
+        with patch("pathlib.Path.read_bytes", side_effect=AssertionError("sensitive file read")) as read_bytes:
+            acceptance_gate.digest_files(acceptance_gate.root(), sensitive)
+        read_bytes.assert_not_called()
+
     @patch("acceptance_gate.git_output")
     def test_fingerprint_ignores_evidence_only_commits_but_tracks_passport(self, mocked_git):
         stable = "100644 aaa 0\tsafe.txt\0"
