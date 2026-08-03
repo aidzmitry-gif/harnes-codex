@@ -11,13 +11,18 @@
     "planRevision": 1,
     "approvedPassportRevision": 1,
     "approvalProvenance": "task-id + user approval timestamp",
+    "canonicalWorkItemPath": ".harness/work/example-goal.md",
     "checkoutWorktreePolicy": "one writer per isolated worktree; primary integrates",
     "globalAgentCap": 2,
     "delegationDepthCap": 1,
     "standingChainAuthorization": "approved",
     "standingAuthorizationScope": "both",
     "currentVerifiedSubgoal": "G01",
-    "nextMinimalSliceAcceptance": "Run the owned targeted test, then the configured local checks."
+    "nextMinimalSliceAcceptance": "Run the owned targeted test, then the configured local checks.",
+    "baselineId": "baseline",
+    "treatmentId": "treatment",
+    "metricsPath": ".harness/metrics/example-goal.jsonl",
+    "metricsSchemaVersion": 1
   },
   "subgoals": [
     {

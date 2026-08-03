@@ -29,7 +29,7 @@ Use one parent work item as the durable source of truth. Keep `.harness/CONTEXT.
 - Current verified subgoal:
 - Next minimal slice and acceptance check:
 - Executable plan snapshot: `.harness/work/<chain>.passport.json` (owner-maintained, validator-readable)
-- Last validated plan snapshot/hash:
+- Last validated plan snapshot/hash: run `git hash-object .harness/work/<chain>.passport.json` immediately after a passing validator check
 - Measurement treatment IDs: baseline `<id>` | treatment `<id>` (assigned before measured execution)
 - Metrics path/schema: `.harness/metrics/<chain>.jsonl` / schema 1
 - Global agent cap: 12

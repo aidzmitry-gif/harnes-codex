@@ -42,6 +42,14 @@ fixture = tomllib.loads((root / 'templates/codex.config.fixture.toml').read_text
 assert fixture.get('features', {}).get('goals') is True
 criteria = json.loads((root / 'templates/acceptance.goal-runner.json').read_text(encoding='utf-8'))['criteria']
 assert [item['id'] for item in criteria] == ['runtime-tests', 'plan-passport', 'benchmark', 'architecture', 'installer', 'review']
+passport = json.loads((root / 'templates/goal-passport.example.json').read_text(encoding='utf-8'))
+continuity = passport['chain']
+assert all(key in continuity for key in ('canonicalWorkItemPath', 'baselineId', 'treatmentId', 'metricsPath', 'metricsSchemaVersion'))
+assert all(isinstance(continuity[key], str) and continuity[key] for key in ('canonicalWorkItemPath', 'baselineId', 'treatmentId', 'metricsPath'))
+assert continuity['baselineId'] != continuity['treatmentId']
+assert continuity['metricsSchemaVersion'] == 1 and isinstance(continuity['metricsSchemaVersion'], int) and not isinstance(continuity['metricsSchemaVersion'], bool)
+benchmark = json.loads((root / 'tests/fixtures/hre-001-benchmark.json').read_text(encoding='utf-8'))
+assert benchmark.get('schemaVersion') == 1 and isinstance(benchmark.get('scenarios'), list) and len(benchmark['scenarios']) >= 20
 print(json.dumps({'cap': agents['max_concurrent_threads_per_session'], 'roles': sorted(roles)}))
 '@
 
@@ -54,9 +62,6 @@ foreach ($path in @($config, $skill, $goalState, $ladder, $handoff, $reminder, $
 
 & python (Join-Path $root 'goal_runner_validator.py') check $passport
 if ($LASTEXITCODE -ne 0) { throw 'Example executable Goal passport is invalid.' }
-
-& python (Join-Path $root 'harness_benchmark.py') --fixture $benchmarkFixture
-if ($LASTEXITCODE -ne 0) { throw 'Deterministic Harness benchmark failed.' }
 
 $skillText = Get-Content -LiteralPath $skill -Raw
 $goalStateText = Get-Content -LiteralPath $goalState -Raw

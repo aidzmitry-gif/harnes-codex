@@ -50,6 +50,7 @@ Installer идемпотентен, проверяет TOML до замены и
 
 ```powershell
 python .\goal_runner_validator.py check .harness\work\<chain>.passport.json
+git hash-object .harness\work\<chain>.passport.json
 ```
 
 Повторяйте проверку до каждой записи worker и после изменения плана, авторизации или реестра агентов. Для измеряемого запуска заранее задайте короткие ID `baseline` и `treatment`. Телеметрию пишите только на контрольных точках запуска/принятой подцели; токены — только фактические значения runtime либо оба `null`:
