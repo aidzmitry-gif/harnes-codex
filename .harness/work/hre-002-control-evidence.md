@@ -39,8 +39,8 @@
 - Commit policy: isolated-worker checkpoints after acceptance; no push
 - Current laziness-ladder rung: 2 — Python stdlib and existing acceptance fingerprint helper
 - Rejected lower rungs: YAGNI fails because evidence-bound dependencies and no-progress were explicitly approved; direct documentation cannot mechanically reject an unsafe transition
-- Current verified subgoal: G02 — bounded no-progress gate integrated after recovery review
-- Next minimal slice and acceptance check: G03 documentation and architecture check separating control DAG from Graphify
+- Current verified subgoal: G03 — docs and architecture check distinguish the control plane from Graphify
+- Next minimal slice and acceptance check: G04 independent verifier reproduces negative cases and completes correctness then simplify review
 - Executable plan snapshot: `.harness/work/hre-002.passport.json`
 - Measurement treatment IDs: baseline `status-only-v1` | treatment `evidence-progress-v1`
 - Metrics path/schema: `.harness/metrics/hre-002.jsonl` / schema 1
@@ -55,7 +55,7 @@
 | P0 | Чистый integration worktree и prechange evidence без затрагивания пользовательского `AGENTS.md` | none | 1 | primary / environment | low | primary / sol | done | clean worktree at `1246c59`; prechange PASS |
 | G01 | Optional `unlockEvidence` проверяет stored fresh evidence без запуска команд; stale/missing evidence и необоснованный `skipped` не открывают потомка; v1 compatibility сохранена | P0 | 2 | `acceptance_gate.py`, `goal_runner_validator.py`, tests, fixture/template | medium | worker / terra | done | targeted tests + compatibility suite |
 | G02 | `goal_progress.py` распознаёт одинаковую попытку как `no_progress`; новая strategy/evidence/fingerprint допускает следующую попытку; passport хранит только bounded state | G01 | 3 | `goal_progress.py`, tests | medium | worker / terra | done | 10 focused tests + validator check + diff check |
-| G03 | Goal Runner docs и example passport различают control DAG и Graphify knowledge graph; Graphify без свежего покрытия не является acceptance evidence | G01,G02 | 4 | skill docs, README, architecture test | low | primary / sol | planned | architecture test + diff review |
+| G03 | Goal Runner docs и example passport различают control DAG и Graphify knowledge graph; Graphify без свежего покрытия не является acceptance evidence | G01,G02 | 4 | skill docs, README, architecture test | low | primary / sol | done | architecture test + diff review |
 | G04 | Независимый read-only verifier воспроизводит негативные сценарии и выполняет correctness затем simplify review | G01,G02,G03 | 5 | read-only integration tree | medium | verifier / sol | planned | reproduced checks and report |
 | G05 | Fresh HRE-002 acceptance, full suite и strict release подтверждают интегрированный результат | G04 | 6 | primary / acceptance and journal | medium | primary / sol | planned | all criteria fresh PASS; strict release PASS |
 
@@ -85,3 +85,4 @@
 | 2026-08-07 | G02 independent artifact review | NOT ACCEPTED | Seven focused tests passed, but raw free-text evidence was hashed and whole-passport validation was absent before state write; recovery is required. |
 | 2026-08-07 | G02 recovery orientation | PASS | Bounded ownership, privacy correction, fail-closed write validation, attempt limit and negative tests were acknowledged. |
 | 2026-08-07 | G02 integration review | PASS | 10 focused tests, passport validator and diff check passed. The signature uses only bounded IDs, status and fingerprints; text changes alone repeat as `NO_PROGRESS`. |
+| 2026-08-07 | G03 architecture review | PASS | Architecture script asserts the no-progress CLI and explicit control-DAG/Graphify boundary; the executable passport remains the only transition authority. |

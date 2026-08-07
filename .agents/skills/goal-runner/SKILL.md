@@ -85,7 +85,14 @@ For each wave:
 9. At meaningful run or accepted-subgoal checkpoints only, use `python harness_metrics.py record --file <metrics.jsonl> --from <event.json>`. Accept only bounded identifiers and structured fields; use actual runtime token counts or both `null`, never estimates, transcripts, or free text. Run paired compare only when valid pairs exist.
 10. Treat `python harness_benchmark.py --fixture tests/fixtures/hre-001-benchmark.json` as a deterministic regression oracle for common-ground-truth quality semantics. It does not prove real-world token savings or statistical significance.
 11. Acceptance evidence is fresh only for the current relevant repository state; after a relevant change, run `acceptance_gate.py prove` again before accepting manual evidence.
-12. Run targeted checks before fast checks; run full checks according to risk.
+12. Before retrying the same subgoal, run `python goal_progress.py check <passport> <subgoal> <strategy>` and record a permitted attempt with `record`. `NO_PROGRESS` is a stop condition: change the bounded strategy, repository state, or structured fresh evidence before retrying; do not evade it by rewriting narrative evidence.
+13. Run targeted checks before fast checks; run full checks according to risk.
+
+### Control DAG and Graphify are separate
+
+- The executable passport is the control DAG: it authorizes dependency transitions, writer ownership, and the no-progress gate.
+- A local Graphify knowledge graph is a read-only discovery aid. It can reduce repository reading, but it neither changes passport status nor unlocks a subgoal.
+- Graphify output is not acceptance evidence by itself. A transition requires the passport's current, fresh acceptance evidence; Graphify may be cited only as navigation to the files or checks that produce that evidence.
 
 Do not reconstruct the parent plan on every cycle. Re-read durable state and only the evidence needed for the next wave.
 
