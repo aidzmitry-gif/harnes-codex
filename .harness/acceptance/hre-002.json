@@ -7,7 +7,7 @@
       "kind": "command",
       "description": "The local unit suite covers fresh evidence, bounded no-progress state and executable-plan validation.",
       "command": "python -m unittest discover -s tests -v",
-      "checkedAt": "2026-08-07T16:16:56.204232+00:00",
+      "checkedAt": "2026-08-07T16:17:34.913004+00:00",
       "fingerprint": {
         "algorithm": "sha256",
         "value": "2e5e166b1f462f6af6437ab3e6431daa7fddf16f82711f8811ff0eb5c6e03c66",
@@ -15,14 +15,14 @@
       },
       "passes": true,
       "evidence": "auto: exit 0; PASS new attempt signature",
-      "durationMs": 3922
+      "durationMs": 3781
     },
     {
       "id": "architecture",
       "kind": "command",
       "description": "The Goal Runner architecture includes the control-DAG versus Graphify boundary.",
       "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-GoalRunnerArchitecture.ps1",
-      "checkedAt": "2026-08-07T16:17:00.122310+00:00",
+      "checkedAt": "2026-08-07T16:17:38.681086+00:00",
       "fingerprint": {
         "algorithm": "sha256",
         "value": "2e5e166b1f462f6af6437ab3e6431daa7fddf16f82711f8811ff0eb5c6e03c66",
@@ -30,14 +30,14 @@
       },
       "passes": true,
       "evidence": "auto: exit 0; PASS Goal Runner architecture contract is internally consistent.",
-      "durationMs": 1031
+      "durationMs": 1141
     },
     {
       "id": "release-gate",
       "kind": "command",
       "description": "The strict local release gate passes without external actions.",
       "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-HarnessGate.ps1 -Stage release -Strict",
-      "checkedAt": "2026-08-07T16:17:01.162150+00:00",
+      "checkedAt": "2026-08-07T16:17:39.825107+00:00",
       "fingerprint": {
         "algorithm": "sha256",
         "value": "2e5e166b1f462f6af6437ab3e6431daa7fddf16f82711f8811ff0eb5c6e03c66",
@@ -45,7 +45,7 @@
       },
       "passes": true,
       "evidence": "auto: exit 0; PASS Harness gate 'release' passed.",
-      "durationMs": 20656
+      "durationMs": 22125
     },
     {
       "id": "independent-review",
