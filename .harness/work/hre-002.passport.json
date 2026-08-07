@@ -17,8 +17,8 @@
     "delegationDepthCap": 1,
     "standingChainAuthorization": "approved",
     "standingAuthorizationScope": "bounded continuation",
-    "currentVerifiedSubgoal": "P0",
-    "nextMinimalSliceAcceptance": "Worker acknowledges G01 ownership and runs targeted acceptance and validator tests after the minimal change.",
+    "currentVerifiedSubgoal": "G01",
+    "nextMinimalSliceAcceptance": "G02 orientation acknowledgement, then focused no-progress tests and a validator check.",
     "baselineId": "status-only-v1",
     "treatmentId": "evidence-progress-v1",
     "metricsPath": ".harness/metrics/hre-002.jsonl",
@@ -39,7 +39,7 @@
       "id": "G01",
       "dependsOn": ["P0"],
       "wave": 2,
-      "status": "ready",
+      "status": "done",
       "execution": "subagent",
       "model": "terra",
       "worktree": ".worktrees/hre-002-g01",
@@ -49,7 +49,7 @@
       "id": "G02",
       "dependsOn": ["G01"],
       "wave": 3,
-      "status": "planned",
+      "status": "ready",
       "execution": "subagent",
       "model": "terra",
       "worktree": ".worktrees/hre-002-g02",
@@ -86,5 +86,16 @@
       "ownedPaths": [".harness/work/hre-002-control-evidence.md", ".harness/work/hre-002.passport.json", ".harness/acceptance/hre-002.json"]
     }
   ],
-  "agents": []
+  "agents": [
+    {
+      "id": "hre002-g01-worker",
+      "subgoalId": "G01",
+      "role": "harness_goal_worker",
+      "depth": 1,
+      "status": "done",
+      "writer": true,
+      "worktree": ".worktrees/hre-002-g01",
+      "ownedPaths": ["acceptance_gate.py", "goal_runner_validator.py", "tests/test_acceptance_gate.py", "tests/test_goal_runner_validator.py", "tests/fixtures/valid_goal_passport.json", "templates/goal-passport.example.json"]
+    }
+  ]
 }

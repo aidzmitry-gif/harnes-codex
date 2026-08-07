@@ -34,6 +34,22 @@ class AcceptanceGateTests(unittest.TestCase):
             {"id": "manual", "kind": "manual", "passes": True, "evidence": "old"}
         ))
 
+    @patch("acceptance_gate.fingerprint", return_value={"algorithm": "sha256", "value": "fresh", "status": "ok"})
+    @patch("acceptance_gate.load")
+    @patch("acceptance_gate.subprocess.run")
+    def test_stored_command_evidence_is_read_without_execution(self, run, mocked_load, _):
+        mocked_load.return_value = {"criteria": [{"id": "check", "kind": "command", "command": "raise-error", "passes": True, "evidence": "saved", "fingerprint": acceptance_gate.fingerprint()}]}
+        self.assertEqual((True, "fresh stored acceptance evidence"), acceptance_gate.stored_evidence_is_fresh("item", "check"))
+        run.assert_not_called()
+
+    @patch("acceptance_gate.fingerprint", return_value={"algorithm": "sha256", "value": "fresh", "status": "ok"})
+    @patch("acceptance_gate.load")
+    def test_stored_evidence_missing_or_stale_fails_closed(self, mocked_load, _):
+        mocked_load.return_value = {"criteria": [{"id": "check", "kind": "manual", "passes": True, "evidence": "", "fingerprint": acceptance_gate.fingerprint()}]}
+        self.assertEqual((False, "missing stored acceptance evidence"), acceptance_gate.stored_evidence_is_fresh("item", "check"))
+        mocked_load.return_value["criteria"][0].update({"evidence": "saved", "fingerprint": {"algorithm": "sha256", "value": "old", "status": "ok"}})
+        self.assertEqual((False, "stale stored acceptance evidence"), acceptance_gate.stored_evidence_is_fresh("item", "check"))
+
     @patch("acceptance_gate.save")
     @patch("acceptance_gate.fingerprint", return_value={"algorithm": "sha256", "value": "fresh", "status": "ok"})
     @patch("acceptance_gate.load")

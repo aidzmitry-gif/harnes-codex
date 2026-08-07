@@ -3,6 +3,7 @@ import subprocess
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from goal_runner_validator import validate_passport
 
@@ -53,6 +54,25 @@ class GoalPassportValidationTests(unittest.TestCase):
     def test_incorrect_ready_wave_is_rejected(self):
         passport = valid_passport(); passport["subgoals"][1]["wave"] = 1
         self.assert_code(passport, "SUBGOAL_WAVE")
+
+    @patch("goal_runner_validator.acceptance_gate.stored_evidence_is_fresh", return_value=(True, "fresh"))
+    def test_ready_subgoal_accepts_fresh_unlock_evidence(self, _):
+        passport = valid_passport(); passport["subgoals"][1]["unlockEvidence"] = {"workItem": "hre-002", "criterionId": "acceptance"}
+        self.assertEqual([], validate_passport(passport))
+
+    @patch("goal_runner_validator.acceptance_gate.stored_evidence_is_fresh", return_value=(False, "stale stored acceptance evidence"))
+    def test_ready_subgoal_rejects_missing_or_stale_unlock_evidence(self, _):
+        passport = valid_passport(); passport["subgoals"][1]["unlockEvidence"] = {"workItem": "hre-002", "criterionId": "acceptance"}
+        self.assert_code(passport, "UNLOCK_EVIDENCE")
+
+    @patch("goal_runner_validator.acceptance_gate.stored_evidence_is_fresh", return_value=(True, "fresh"))
+    def test_evidence_bound_skipped_dependency_requires_reason(self, _):
+        passport = valid_passport(); passport["subgoals"][0]["status"] = "skipped"; passport["subgoals"][1]["unlockEvidence"] = {"workItem": "hre-002", "criterionId": "acceptance"}
+        self.assert_code(passport, "SUBGOAL_SKIP_REASON")
+        passport["subgoals"][0]["skipReason"] = "  "
+        self.assert_code(passport, "SUBGOAL_SKIP_REASON")
+        passport["subgoals"][0]["skipReason"] = "owner-approved"
+        self.assertEqual([], validate_passport(passport))
 
     def test_cap_and_depth_excess_are_rejected(self):
         passport = valid_passport(); passport["chain"]["globalAgentCap"] = 1; passport["agents"].append(copy.deepcopy(passport["agents"][0])); passport["agents"][1].update({"id": "a2", "depth": 2, "worktree": "g03"})

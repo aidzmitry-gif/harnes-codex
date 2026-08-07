@@ -7,6 +7,8 @@ import re
 import sys
 from pathlib import Path
 
+import acceptance_gate
+
 
 CHAIN_STATUSES = {"planning", "approved", "running", "verifying", "awaiting-user-review", "complete", "blocked"}
 SUBGOAL_STATUSES = {"planned", "ready", "running", "done", "blocked", "skipped"}
@@ -164,6 +166,16 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
         elif isinstance(item.get("ownedPaths"), list):
             for path_index, path in enumerate(item["ownedPaths"]):
                 portable_relative_path(path, f"subgoals[{index}].ownedPaths[{path_index}]")
+        unlock = item.get("unlockEvidence")
+        if unlock is not None:
+            if not isinstance(unlock, dict):
+                fail("UNLOCK_EVIDENCE", f"subgoals[{index}].unlockEvidence must be an object")
+            else:
+                work_item, criterion_id = unlock.get("workItem"), unlock.get("criterionId")
+                if not isinstance(work_item, str) or not work_item.replace("-", "").replace("_", "").isalnum():
+                    fail("UNLOCK_EVIDENCE", f"subgoals[{index}].unlockEvidence.workItem is invalid")
+                if not isinstance(criterion_id, str) or not BOUNDED_ID.fullmatch(criterion_id):
+                    fail("UNLOCK_EVIDENCE", f"subgoals[{index}].unlockEvidence.criterionId is invalid")
 
     def dependencies(item: dict) -> list[str]:
         return item.get("dependsOn") if isinstance(item.get("dependsOn"), list) else []
@@ -179,6 +191,17 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
             unfinished = [dep for dep in dependencies(item) if dep in by_id and by_id[dep].get("status") not in {"done", "skipped"}]
             if unfinished:
                 fail("SUBGOAL_READY", f"{identifier} has unfinished dependencies: {', '.join(sorted(unfinished))}")
+            unlock = item.get("unlockEvidence")
+            if isinstance(unlock, dict) and isinstance(unlock.get("workItem"), str) and isinstance(unlock.get("criterionId"), str):
+                skipped = [dep for dep in dependencies(item) if dep in by_id and by_id[dep].get("status") == "skipped" and (not isinstance(by_id[dep].get("skipReason"), str) or not by_id[dep]["skipReason"].strip())]
+                if skipped:
+                    fail("SUBGOAL_SKIP_REASON", f"{identifier} has skipped dependencies without skipReason: {', '.join(sorted(skipped))}")
+                try:
+                    fresh, note = acceptance_gate.stored_evidence_is_fresh(unlock["workItem"], unlock["criterionId"])
+                except (OSError, ValueError, json.JSONDecodeError) as exc:
+                    fresh, note = False, str(exc)
+                if not fresh:
+                    fail("UNLOCK_EVIDENCE", f"{identifier} unlock evidence is not fresh: {note}")
 
     visiting: set[str] = set()
     visited: set[str] = set()

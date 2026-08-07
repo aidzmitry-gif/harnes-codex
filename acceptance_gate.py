@@ -53,6 +53,8 @@ def validate(data: dict) -> list[dict]:
         raise ValueError("gate must contain a non-empty 'criteria' array")
     seen: set[str] = set()
     for criterion in criteria:
+        if not isinstance(criterion, dict):
+            raise ValueError("each criterion must be an object")
         cid = criterion.get("id")
         kind = criterion.get("kind")
         if not isinstance(cid, str) or not cid or cid in seen:
@@ -195,6 +197,23 @@ def prove(args: argparse.Namespace) -> int:
             return 0
     print("FAIL criterion does not exist", file=sys.stderr)
     return 2
+
+
+def stored_evidence_is_fresh(work_item: str, criterion_id: str) -> tuple[bool, str]:
+    """Read stored criterion evidence without executing command criteria."""
+    data = load(gate_path(work_item))
+    for criterion in validate(data):
+        if criterion["id"] != criterion_id:
+            continue
+        evidence = str(criterion.get("evidence", "")).strip()
+        stored = criterion.get("fingerprint")
+        current = fingerprint()
+        if not evidence or not criterion.get("passes"):
+            return False, "missing stored acceptance evidence"
+        if not isinstance(stored, dict) or stored.get("status") != "ok" or current.get("status") != "ok" or stored != current:
+            return False, "stale stored acceptance evidence"
+        return True, "fresh stored acceptance evidence"
+    return False, "missing stored acceptance criterion"
 
 
 def evaluate(criterion: dict) -> tuple[bool, str]:

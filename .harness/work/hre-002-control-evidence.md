@@ -59,6 +59,12 @@
 | G04 | Независимый read-only verifier воспроизводит негативные сценарии и выполняет correctness затем simplify review | G01,G02,G03 | 5 | read-only integration tree | medium | verifier / sol | planned | reproduced checks and report |
 | G05 | Fresh HRE-002 acceptance, full suite и strict release подтверждают интегрированный результат | G04 | 6 | primary / acceptance and journal | medium | primary / sol | planned | all criteria fresh PASS; strict release PASS |
 
+## Agent registry
+
+| Agent | Subgoal | Role/model | Worktree | Status | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| `hre002-g01-worker` | G01 | worker / terra-medium | `.worktrees/hre-002-g01` | done | Orientation acknowledgement matched; integration re-ran 32 focused tests, validator and diff check. |
+
 ## План проверок
 
 1. `python -m unittest tests.test_acceptance_gate tests.test_goal_runner_validator -v` для G01.
@@ -71,3 +77,5 @@
 | Время | Проверка | Результат | Вывод |
 | --- | --- | --- | --- |
 | 2026-08-07 | P0: clean `codex/hre-002-control-evidence` worktree from `1246c59`; `Invoke-HarnessGate.ps1 -Stage prechange` | PASS; 38 tests | User-owned `AGENTS.md` remains only in the main checkout and is untouched. |
+| 2026-08-07 | G01 orientation acknowledgement | PASS | Worker accepted ownership and negative-evidence contract; implementation may begin only from the validated passport. |
+| 2026-08-07 | G01 integration review | PASS | 32 focused tests, current HRE-002 passport validator and diff check passed; stored evidence path does not execute command criteria. |
