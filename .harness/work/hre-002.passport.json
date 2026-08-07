@@ -8,17 +8,17 @@
     "externalSideEffectBoundary": "local-only; no network, push, deploy, migration, deletion, or secrets",
     "parentOutcome": "Evidence-bound Goal Runner transitions and a local no-progress stop condition.",
     "status": "approved",
-    "planRevision": 1,
-    "approvedPassportRevision": 1,
-    "approvalProvenance": "current task; user approved HRE-002 revision 1 on 2026-08-07 Europe/Minsk",
+    "planRevision": 2,
+    "approvedPassportRevision": 2,
+    "approvalProvenance": "revision 1 explicitly approved by user on 2026-08-07 Europe/Minsk; revision 2 is a bounded corrective slice after G04 found contract defects, with unchanged outcome, owner, risk and external-effect boundary",
     "canonicalWorkItemPath": ".harness/work/hre-002-control-evidence.md",
     "checkoutWorktreePolicy": "one writer per clean isolated worktree; primary integrates",
     "globalAgentCap": 2,
     "delegationDepthCap": 1,
     "standingChainAuthorization": "approved",
     "standingAuthorizationScope": "bounded continuation",
-    "currentVerifiedSubgoal": "G03",
-    "nextMinimalSliceAcceptance": "G04: independent verifier reproduces negative cases and completes correctness then simplify review.",
+    "currentVerifiedSubgoal": "G02",
+    "nextMinimalSliceAcceptance": "G04 retry: independently reproduce the three former findings and complete correctness then simplify review.",
     "baselineId": "status-only-v1",
     "treatmentId": "evidence-progress-v1",
     "metricsPath": ".harness/metrics/hre-002.jsonl",
@@ -50,10 +50,10 @@
       "dependsOn": ["G01"],
       "wave": 3,
       "status": "done",
-      "execution": "subagent",
-      "model": "terra",
-      "worktree": ".worktrees/hre-002-g02",
-      "ownedPaths": ["goal_progress.py", "tests/test_goal_progress.py"]
+      "execution": "primary",
+      "model": "sol",
+      "worktree": null,
+      "ownedPaths": ["acceptance_gate.py", "goal_runner_validator.py", "goal_progress.py", "tests/test_acceptance_gate.py", "tests/test_goal_runner_validator.py", "tests/test_goal_progress.py"]
     },
     {
       "id": "G03",
@@ -69,7 +69,7 @@
       "id": "G04",
       "dependsOn": ["G01", "G02", "G03"],
       "wave": 5,
-      "status": "planned",
+      "status": "running",
       "execution": "subagent",
       "model": "sol",
       "worktree": null,
@@ -116,6 +116,26 @@
       "writer": true,
       "worktree": ".worktrees/hre-002-g02",
       "ownedPaths": ["goal_progress.py", "tests/test_goal_progress.py"]
+    },
+    {
+      "id": "hre002-g04-verifier",
+      "subgoalId": "G04",
+      "role": "harness_goal_verifier",
+      "depth": 1,
+      "status": "done",
+      "writer": false,
+      "worktree": null,
+      "ownedPaths": []
+    },
+    {
+      "id": "hre002-g04-retry-verifier",
+      "subgoalId": "G04",
+      "role": "harness_goal_verifier",
+      "depth": 1,
+      "status": "active",
+      "writer": false,
+      "worktree": null,
+      "ownedPaths": []
     }
   ]
 }

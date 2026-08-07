@@ -43,6 +43,11 @@ class GoalPassportValidationTests(unittest.TestCase):
         self.assertIn("CHAIN_CONTINUITY", codes)
         self.assertIn("REQUIRED", codes)
 
+    def test_goal_progress_is_validated_as_bounded_machine_state(self):
+        passport = valid_passport()
+        passport["goalProgress"] = {"schemaVersion": 1, "attempts": [{"transcript": "free text"}]}
+        self.assert_code(passport, "GOAL_PROGRESS")
+
     def test_duplicate_and_unknown_dependencies_are_rejected(self):
         passport = valid_passport(); passport["subgoals"][1]["dependsOn"] = ["missing", "missing"]
         self.assert_code(passport, "SUBGOAL_DEPENDS")

@@ -50,6 +50,16 @@ class AcceptanceGateTests(unittest.TestCase):
         mocked_load.return_value["criteria"][0].update({"evidence": "saved", "fingerprint": {"algorithm": "sha256", "value": "old", "status": "ok"}})
         self.assertEqual((False, "stale stored acceptance evidence"), acceptance_gate.stored_evidence_is_fresh("item", "check"))
 
+    @patch("acceptance_gate.fingerprint", return_value={"algorithm": "sha256", "value": "fresh", "status": "ok"})
+    @patch("acceptance_gate.load")
+    def test_non_boolean_passes_never_opens_stored_evidence(self, mocked_load, _):
+        criterion = {"id": "check", "kind": "manual", "passes": "false", "evidence": "saved", "fingerprint": acceptance_gate.fingerprint()}
+        mocked_load.return_value = {"criteria": [criterion]}
+        self.assertEqual((False, "missing stored acceptance evidence"), acceptance_gate.stored_evidence_is_fresh("item", "check"))
+        criterion["passes"] = 1
+        self.assertEqual((False, "missing stored acceptance evidence"), acceptance_gate.stored_evidence_is_fresh("item", "check"))
+        self.assertFalse(acceptance_gate.evaluate(criterion)[0])
+
     @patch("acceptance_gate.save")
     @patch("acceptance_gate.fingerprint", return_value={"algorithm": "sha256", "value": "fresh", "status": "ok"})
     @patch("acceptance_gate.load")
@@ -98,6 +108,13 @@ class AcceptanceGateTests(unittest.TestCase):
         self.assertTrue(acceptance_gate.excluded(PurePosixPath(".harness/work/notes.md")))
         self.assertFalse(acceptance_gate.excluded(PurePosixPath(".harness/work/goal.passport.json")))
         self.assertFalse(acceptance_gate.excluded(PurePosixPath("src/credential_validator.py")))
+
+    def test_explicit_ignored_path_is_safe_and_narrow(self):
+        ignored = acceptance_gate.normalize_ignored_paths({".harness/work/goal.passport.json"})
+        self.assertTrue(acceptance_gate.excluded(PurePosixPath(".harness/work/goal.passport.json"), ignored))
+        self.assertFalse(acceptance_gate.excluded(PurePosixPath(".harness/work/other.passport.json"), ignored))
+        with self.assertRaises(ValueError):
+            acceptance_gate.normalize_ignored_paths({"../outside"})
 
     def test_sensitive_files_are_never_read_for_fingerprinting(self):
         sensitive = [".env.local", "secrets/key", "credentials.json", ".ssh/id_rsa", "config/private.pem"]

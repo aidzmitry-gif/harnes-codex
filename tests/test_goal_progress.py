@@ -1,5 +1,7 @@
 import json
 import unittest
+from copy import deepcopy
+from pathlib import Path
 from unittest.mock import patch
 
 import goal_progress
@@ -118,12 +120,24 @@ class GoalProgressTests(unittest.TestCase):
                     "repositoryFingerprint": FINGERPRINT,
                     "unlockEvidenceFingerprint": None,
                 }
-                for index in range(goal_progress.MAX_ATTEMPTS + 1)
+                for index in range(goal_progress.MAX_ATTEMPTS)
             ],
         }
         read_text.return_value = json.dumps(passport)
         self.assertEqual(2, self.invoke("record"))
         save_atomic.assert_not_called()
+
+    @patch("goal_progress.acceptance_gate.fingerprint", return_value=FINGERPRINT)
+    def test_recorded_state_is_excluded_but_other_passport_state_is_tracked(self, mocked_fingerprint):
+        passport = valid_passport()
+        path = Path("passport.json")
+        first = goal_progress.attempt_signature(passport, path, "G02", "minimal")
+        recorded = deepcopy(passport)
+        recorded["goalProgress"] = {"schemaVersion": 1, "attempts": [first]}
+        self.assertEqual(first, goal_progress.attempt_signature(recorded, path, "G02", "minimal"))
+        recorded["chain"]["parentOutcome"] = "changed"
+        self.assertNotEqual(first, goal_progress.attempt_signature(recorded, path, "G02", "minimal"))
+        mocked_fingerprint.assert_called_with(ignored_paths={"passport.json"})
 
     @patch("goal_progress.Path.read_text")
     @patch("goal_progress.acceptance_gate.subprocess.run")

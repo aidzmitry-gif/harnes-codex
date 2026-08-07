@@ -9,10 +9,11 @@ import os
 import re
 import sys
 import tempfile
+from copy import deepcopy
 from pathlib import Path
 
 import acceptance_gate
-from goal_runner_validator import validate_passport
+from goal_runner_validator import MAX_GOAL_PROGRESS_ATTEMPTS, validate_goal_progress, validate_passport
 
 
 BOUNDED_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:+/@-]{0,63}$")
@@ -20,7 +21,7 @@ FINGERPRINT = re.compile(r"^[0-9a-f]{64}$")
 STATE_KEY = "goalProgress"
 # ponytail: retain at most 256 unique signatures per passport. If a chain
 # genuinely needs more, add a bounded signature index before raising this cap.
-MAX_ATTEMPTS = 256
+MAX_ATTEMPTS = MAX_GOAL_PROGRESS_ATTEMPTS
 
 
 class ProgressError(ValueError):
@@ -82,7 +83,23 @@ def evidence_fingerprint(unlock: object) -> dict[str, str] | None:
     return {"algorithm": "sha256", "status": "ok", "value": stable_digest(payload)}
 
 
-def attempt_signature(passport: object, subgoal_id: str, strategy_id: str) -> dict[str, object]:
+def progress_repository_fingerprint(passport: dict, passport_path: Path) -> dict[str, str]:
+    """Ignore only durable attempt state while retaining the rest of the passport."""
+    root = acceptance_gate.root().resolve()
+    try:
+        relative = passport_path.resolve().relative_to(root).as_posix()
+    except ValueError as exc:
+        raise ProgressError("passport must stay under the acceptance-gate repository root") from exc
+    semantic_passport = deepcopy(passport)
+    semantic_passport.pop(STATE_KEY, None)
+    payload = {
+        "passport": stable_digest(semantic_passport),
+        "repository": fingerprint(acceptance_gate.fingerprint(ignored_paths={relative})),
+    }
+    return {"algorithm": "sha256", "status": "ok", "value": stable_digest(payload)}
+
+
+def attempt_signature(passport: object, passport_path: Path, subgoal_id: str, strategy_id: str) -> dict[str, object]:
     """Build the bounded signature for one attempt using current local state."""
     if not isinstance(passport, dict) or not isinstance(passport.get("chain"), dict):
         raise ProgressError("passport.chain must be an object")
@@ -97,7 +114,7 @@ def attempt_signature(passport: object, subgoal_id: str, strategy_id: str) -> di
         "chainId": chain_id,
         "subgoalId": bounded(subgoal_id, "subgoal"),
         "strategyId": bounded(strategy_id, "strategy"),
-        "repositoryFingerprint": fingerprint(acceptance_gate.fingerprint()),
+        "repositoryFingerprint": progress_repository_fingerprint(passport, passport_path),
         "unlockEvidenceFingerprint": evidence_fingerprint(matches[0].get("unlockEvidence")),
     }
 
@@ -107,26 +124,13 @@ def validate_state(passport: dict) -> list[dict[str, object]]:
     state = passport.get(STATE_KEY)
     if state is None:
         return []
-    if not isinstance(state, dict) or set(state) != {"schemaVersion", "attempts"} or state.get("schemaVersion") != 1 or not isinstance(state.get("attempts"), list):
-        raise ProgressError("goalProgress must contain schemaVersion 1 and attempts")
-    if len(state["attempts"]) > MAX_ATTEMPTS:
-        raise ProgressError(f"goalProgress may contain at most {MAX_ATTEMPTS} attempts")
+    errors = validate_goal_progress(state)
+    if errors:
+        raise ProgressError(errors[0][1])
     attempts: list[dict[str, object]] = []
     for item in state["attempts"]:
-        if not isinstance(item, dict) or set(item) != {"chainId", "subgoalId", "strategyId", "repositoryFingerprint", "unlockEvidenceFingerprint"}:
-            raise ProgressError("goalProgress attempt has invalid fields")
-        for field in ("chainId", "subgoalId", "strategyId"):
-            bounded(item[field], f"goalProgress.{field}")
         entry = dict(item)
-        entry["repositoryFingerprint"] = fingerprint(item["repositoryFingerprint"])
-        evidence = item["unlockEvidenceFingerprint"]
-        if evidence is not None:
-            if not isinstance(evidence, dict) or set(evidence) != {"algorithm", "status", "value"} or evidence.get("algorithm") != "sha256" or evidence.get("status") not in {"ok", "missing"} or not isinstance(evidence.get("value"), str) or not FINGERPRINT.fullmatch(evidence["value"]):
-                raise ProgressError("goalProgress unlock evidence fingerprint is invalid")
-            entry["unlockEvidenceFingerprint"] = dict(evidence)
         attempts.append(entry)
-    if len({stable_digest(item) for item in attempts}) != len(attempts):
-        raise ProgressError("goalProgress attempts must be unique")
     return attempts
 
 
@@ -157,13 +161,16 @@ def main(argv: list[str] | None = None) -> int:
             if passport_errors:
                 raise ProgressError(f"passport is invalid: {passport_errors[0][0]}")
         attempts = validate_state(passport)
-        signature = attempt_signature(passport, subgoal_id, strategy_id)
+        signature = attempt_signature(passport, path, subgoal_id, strategy_id)
     except (OSError, json.JSONDecodeError, ProgressError) as exc:
         print(f"FAIL INPUT: {exc}", file=sys.stderr)
         return 2
     if signature in attempts:
         print("NO_PROGRESS identical attempt signature", file=sys.stderr)
         return 1
+    if len(attempts) >= MAX_ATTEMPTS:
+        print(f"FAIL INPUT: goalProgress may contain at most {MAX_ATTEMPTS} attempts", file=sys.stderr)
+        return 2
     if action == "check":
         print("PASS new attempt signature")
         return 0

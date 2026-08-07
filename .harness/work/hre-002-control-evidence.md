@@ -32,15 +32,15 @@
 - External-side-effect boundary: local-only; no network, push, deploy, migration, deletion, or secrets
 - Parent outcome: evidence-bound DAG transitions and a local no-progress stop condition
 - Status: approved
-- Plan revision: 1
-- Approved passport revision: 1
-- Approval provenance: current task; user message `Подтверждаю HRE-002 revision 1; AGENTS.md оставить моим baseline и не трогать.`; 2026-08-07 Europe/Minsk
+- Plan revision: 2
+- Approved passport revision: 2
+- Approval provenance: user message `Подтверждаю HRE-002 revision 1; AGENTS.md оставить моим baseline и не трогать.`; 2026-08-07 Europe/Minsk. Revision 2 is a bounded corrective slice after independent G04 findings; parent outcome, data owner, risk and external-effect boundary are unchanged.
 - Checkout/worktree policy: clean integration worktree; one writer per isolated worker worktree; primary serializes integration
 - Commit policy: isolated-worker checkpoints after acceptance; no push
 - Current laziness-ladder rung: 2 — Python stdlib and existing acceptance fingerprint helper
 - Rejected lower rungs: YAGNI fails because evidence-bound dependencies and no-progress were explicitly approved; direct documentation cannot mechanically reject an unsafe transition
-- Current verified subgoal: G03 — docs and architecture check distinguish the control plane from Graphify
-- Next minimal slice and acceptance check: G04 independent verifier reproduces negative cases and completes correctness then simplify review
+- Current verified subgoal: G02 — revision-2 targeted tests cover and close the four G04 findings
+- Next minimal slice and acceptance check: G04 retry independently reproduces the former defects and completes correctness then simplify review
 - Executable plan snapshot: `.harness/work/hre-002.passport.json`
 - Measurement treatment IDs: baseline `status-only-v1` | treatment `evidence-progress-v1`
 - Metrics path/schema: `.harness/metrics/hre-002.jsonl` / schema 1
@@ -54,9 +54,9 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | P0 | Чистый integration worktree и prechange evidence без затрагивания пользовательского `AGENTS.md` | none | 1 | primary / environment | low | primary / sol | done | clean worktree at `1246c59`; prechange PASS |
 | G01 | Optional `unlockEvidence` проверяет stored fresh evidence без запуска команд; stale/missing evidence и необоснованный `skipped` не открывают потомка; v1 compatibility сохранена | P0 | 2 | `acceptance_gate.py`, `goal_runner_validator.py`, tests, fixture/template | medium | worker / terra | done | targeted tests + compatibility suite |
-| G02 | `goal_progress.py` распознаёт одинаковую попытку как `no_progress`; новая strategy/evidence/fingerprint допускает следующую попытку; passport хранит только bounded state | G01 | 3 | `goal_progress.py`, tests | medium | worker / terra | done | 10 focused tests + validator check + diff check |
+| G02 | `goal_progress.py` распознаёт одинаковую попытку как `no_progress`; новая strategy/evidence/fingerprint допускает следующую попытку; passport хранит только bounded state | G01 | 3 | acceptance/progress/validator и их tests | medium | primary / sol | done | 46 targeted tests close G04 findings; fresh independent review remains G04 |
 | G03 | Goal Runner docs и example passport различают control DAG и Graphify knowledge graph; Graphify без свежего покрытия не является acceptance evidence | G01,G02 | 4 | skill docs, README, architecture test | low | primary / sol | done | architecture test + diff review |
-| G04 | Независимый read-only verifier воспроизводит негативные сценарии и выполняет correctness затем simplify review | G01,G02,G03 | 5 | read-only integration tree | medium | verifier / sol | planned | reproduced checks and report |
+| G04 | Независимый read-only verifier воспроизводит негативные сценарии и выполняет correctness затем simplify review | G01,G02,G03 | 5 | read-only integration tree | medium | verifier / sol | running | fresh reproduced checks and report after G02 correction |
 | G05 | Fresh HRE-002 acceptance, full suite и strict release подтверждают интегрированный результат | G04 | 6 | primary / acceptance and journal | medium | primary / sol | planned | all criteria fresh PASS; strict release PASS |
 
 ## Agent registry
@@ -66,6 +66,8 @@
 | `hre002-g01-worker` | G01 | worker / terra-medium | `.worktrees/hre-002-g01` | done | Orientation acknowledgement matched; integration re-ran 32 focused tests, validator and diff check. |
 | `hre002-g02-worker` | G02 | worker / terra-medium | `.worktrees/hre-002-g02` | interrupted | Orientation acknowledgement matched; the task ended before a report, so its uncommitted artifact is input to independent review only. |
 | `hre002-g02-recovery` | G02 | worker / terra-medium | `.worktrees/hre-002-g02` | done | Ten focused tests and diff check passed; primary independently reproduced the results before integration. |
+| `hre002-g04-verifier` | G04 | verifier / sol-high | read-only integration tree | done/reject | Found three correctness defects and one validator coverage gap; no source files modified. |
+| `hre002-g04-retry-verifier` | G04 | verifier / sol-high | read-only integration tree | active | Will independently reproduce the repaired self-fingerprint, strict boolean, state-limit and validator-schema cases. |
 
 ## План проверок
 
@@ -86,3 +88,5 @@
 | 2026-08-07 | G02 recovery orientation | PASS | Bounded ownership, privacy correction, fail-closed write validation, attempt limit and negative tests were acknowledged. |
 | 2026-08-07 | G02 integration review | PASS | 10 focused tests, passport validator and diff check passed. The signature uses only bounded IDs, status and fingerprints; text changes alone repeat as `NO_PROGRESS`. |
 | 2026-08-07 | G03 architecture review | PASS | Architecture script asserts the no-progress CLI and explicit control-DAG/Graphify boundary; the executable passport remains the only transition authority. |
+| 2026-08-07 | G04 independent verifier | REJECT | Self-record changed the next repository fingerprint; `passes` truthiness accepted non-bool values; attempt limit allowed 257th write; shared validator ignored `goalProgress`. Revision 2 corrects these defects without expanding the parent outcome. |
+| 2026-08-07 | G02 revision-2 correction | PASS (targeted) | 46 focused tests cover self-state exclusion while retaining other passport changes, strict boolean `passes`, exact 256 boundary and shared `goalProgress` schema validation. |
