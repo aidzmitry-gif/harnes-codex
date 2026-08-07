@@ -67,7 +67,8 @@
 | `hre002-g02-worker` | G02 | worker / terra-medium | `.worktrees/hre-002-g02` | interrupted | Orientation acknowledgement matched; the task ended before a report, so its uncommitted artifact is input to independent review only. |
 | `hre002-g02-recovery` | G02 | worker / terra-medium | `.worktrees/hre-002-g02` | done | Ten focused tests and diff check passed; primary independently reproduced the results before integration. |
 | `hre002-g04-verifier` | G04 | verifier / sol-high | read-only integration tree | done/reject | Found three correctness defects and one validator coverage gap; no source files modified. |
-| `hre002-g04-retry-verifier` | G04 | verifier / sol-high | read-only integration tree | active | Will independently reproduce the repaired self-fingerprint, strict boolean, state-limit and validator-schema cases. |
+| `hre002-g04-retry-verifier` | G04 | verifier / sol-high | read-only integration tree | done/reject | Closed four former findings and isolated the float schema-version type defect. |
+| `hre002-g04-final-verifier` | G04 | verifier / sol-high | read-only integration tree | active | Final short verifier run after the schema-version type correction. |
 
 ## План проверок
 
@@ -90,3 +91,4 @@
 | 2026-08-07 | G03 architecture review | PASS | Architecture script asserts the no-progress CLI and explicit control-DAG/Graphify boundary; the executable passport remains the only transition authority. |
 | 2026-08-07 | G04 independent verifier | REJECT | Self-record changed the next repository fingerprint; `passes` truthiness accepted non-bool values; attempt limit allowed 257th write; shared validator ignored `goalProgress`. Revision 2 corrects these defects without expanding the parent outcome. |
 | 2026-08-07 | G02 revision-2 correction | PASS (targeted) | 46 focused tests cover self-state exclusion while retaining other passport changes, strict boolean `passes`, exact 256 boundary and shared `goalProgress` schema validation. |
+| 2026-08-07 | G04 retry verifier | REJECT | Four prior findings closed, but `goalProgress.schemaVersion: 1.0` was accepted as integer 1. Corrected with an explicit integer check and a regression test; final verifier remains required. |

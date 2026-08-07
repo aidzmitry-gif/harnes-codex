@@ -132,6 +132,16 @@
       "subgoalId": "G04",
       "role": "harness_goal_verifier",
       "depth": 1,
+      "status": "done",
+      "writer": false,
+      "worktree": null,
+      "ownedPaths": []
+    },
+    {
+      "id": "hre002-g04-final-verifier",
+      "subgoalId": "G04",
+      "role": "harness_goal_verifier",
+      "depth": 1,
       "status": "active",
       "writer": false,
       "worktree": null,

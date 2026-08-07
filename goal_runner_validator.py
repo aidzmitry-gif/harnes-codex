@@ -26,7 +26,7 @@ def validate_goal_progress(value: object) -> list[tuple[str, str]]:
         return []
     if not isinstance(value, dict) or set(value) != {"schemaVersion", "attempts"}:
         return [("GOAL_PROGRESS", "goalProgress must contain only schemaVersion and attempts")]
-    if isinstance(value.get("schemaVersion"), bool) or value.get("schemaVersion") != 1:
+    if not isinstance(value.get("schemaVersion"), int) or isinstance(value.get("schemaVersion"), bool) or value.get("schemaVersion") != 1:
         return [("GOAL_PROGRESS", "goalProgress.schemaVersion must be integer 1")]
     attempts = value.get("attempts")
     if not isinstance(attempts, list) or len(attempts) > MAX_GOAL_PROGRESS_ATTEMPTS:

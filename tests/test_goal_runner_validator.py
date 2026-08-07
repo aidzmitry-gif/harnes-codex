@@ -47,6 +47,8 @@ class GoalPassportValidationTests(unittest.TestCase):
         passport = valid_passport()
         passport["goalProgress"] = {"schemaVersion": 1, "attempts": [{"transcript": "free text"}]}
         self.assert_code(passport, "GOAL_PROGRESS")
+        passport["goalProgress"] = {"schemaVersion": 1.0, "attempts": []}
+        self.assert_code(passport, "GOAL_PROGRESS")
 
     def test_duplicate_and_unknown_dependencies_are_rejected(self):
         passport = valid_passport(); passport["subgoals"][1]["dependsOn"] = ["missing", "missing"]

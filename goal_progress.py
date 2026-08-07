@@ -9,7 +9,6 @@ import os
 import re
 import sys
 import tempfile
-from copy import deepcopy
 from pathlib import Path
 
 import acceptance_gate
@@ -90,7 +89,7 @@ def progress_repository_fingerprint(passport: dict, passport_path: Path) -> dict
         relative = passport_path.resolve().relative_to(root).as_posix()
     except ValueError as exc:
         raise ProgressError("passport must stay under the acceptance-gate repository root") from exc
-    semantic_passport = deepcopy(passport)
+    semantic_passport = dict(passport)
     semantic_passport.pop(STATE_KEY, None)
     payload = {
         "passport": stable_digest(semantic_passport),
