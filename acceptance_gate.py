@@ -53,6 +53,8 @@ def validate(data: dict) -> list[dict]:
         raise ValueError("gate must contain a non-empty 'criteria' array")
     seen: set[str] = set()
     for criterion in criteria:
+        if not isinstance(criterion, dict):
+            raise ValueError("each criterion must be an object")
         cid = criterion.get("id")
         kind = criterion.get("kind")
         if not isinstance(cid, str) or not cid or cid in seen:
@@ -72,10 +74,29 @@ def now_utc() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def excluded(relative: PurePosixPath) -> bool:
+def normalize_ignored_paths(paths: object) -> frozenset[str]:
+    """Return safe repository-relative paths deliberately omitted from a fingerprint."""
+    if paths is None:
+        return frozenset()
+    if not isinstance(paths, (set, frozenset, tuple, list)):
+        raise ValueError("ignored paths must be a collection of safe relative paths")
+    result: set[str] = set()
+    for value in paths:
+        if not isinstance(value, str) or not value or "\\" in value:
+            raise ValueError("ignored path must be a nonempty portable relative path")
+        relative = PurePosixPath(value)
+        if relative.is_absolute() or any(part in {"", ".", ".."} for part in relative.parts):
+            raise ValueError("ignored path must stay within the repository")
+        result.add(relative.as_posix())
+    return frozenset(result)
+
+
+def excluded(relative: PurePosixPath, ignored: frozenset[str] = frozenset()) -> bool:
     parts = tuple(part.lower() for part in relative.parts)
     name = parts[-1] if parts else ""
     return (
+        relative.as_posix() in ignored
+        or
         any(part in {".git", ".worktrees", "graphify-out", "__pycache__"} | SENSITIVE_DIRECTORIES for part in parts)
         or (len(parts) >= 2 and parts[:2] == (".harness", "acceptance"))
         or (len(parts) >= 2 and parts[:2] == (".harness", "work") and not name.endswith(".passport.json"))
@@ -86,12 +107,12 @@ def excluded(relative: PurePosixPath) -> bool:
     )
 
 
-def digest_files(base: Path, names: list[str]) -> str:
+def digest_files(base: Path, names: list[str], ignored: frozenset[str] = frozenset()) -> str:
     digest = hashlib.sha256()
     base_resolved = base.resolve()
     for name in sorted(names):
         relative = PurePosixPath(name)
-        if excluded(relative):
+        if excluded(relative, ignored):
             continue
         path = base.joinpath(*relative.parts)
         digest.update(name.encode("utf-8"))
@@ -117,41 +138,42 @@ def git_output(*args: str) -> str:
     ).stdout
 
 
-def non_git_fingerprint() -> dict[str, str]:
+def non_git_fingerprint(ignored: frozenset[str] = frozenset()) -> dict[str, str]:
     try:
         files = [path.relative_to(root()).as_posix() for path in root().rglob("*") if path.is_file()]
-        return {"algorithm": "sha256", "value": digest_files(root(), files), "status": "ok"}
+        return {"algorithm": "sha256", "value": digest_files(root(), files, ignored), "status": "ok"}
     except OSError:
         return {"algorithm": "sha256", "value": "", "status": "unavailable"}
 
 
-def fingerprint() -> dict[str, str]:
+def fingerprint(*, ignored_paths: object = None) -> dict[str, str]:
     """Return a deterministic safe project-state fingerprint, or explicit unavailability."""
     try:
+        ignored = normalize_ignored_paths(ignored_paths)
         git_output("rev-parse", "--is-inside-work-tree")
         index_digest = hashlib.sha256()
         for row in git_output("ls-files", "-s", "-z").split("\0"):
             if not row or "\t" not in row:
                 continue
             metadata, name = row.split("\t", 1)
-            if excluded(PurePosixPath(name)):
+            if excluded(PurePosixPath(name), ignored):
                 continue
             index_digest.update(metadata.encode("utf-8"))
             index_digest.update(b"\t")
             index_digest.update(name.encode("utf-8"))
             index_digest.update(b"\0")
-        changed = [name for name in git_output("diff", "--name-only", "-z").split("\0") if name and not excluded(PurePosixPath(name))]
-        untracked = [name for name in git_output("ls-files", "--others", "--exclude-standard", "-z").split("\0") if name and not excluded(PurePosixPath(name))]
+        changed = [name for name in git_output("diff", "--name-only", "-z").split("\0") if name and not excluded(PurePosixPath(name), ignored)]
+        untracked = [name for name in git_output("ls-files", "--others", "--exclude-standard", "-z").split("\0") if name and not excluded(PurePosixPath(name), ignored)]
         payload = json.dumps({
             "index": index_digest.hexdigest(),
-            "worktree": digest_files(root(), changed),
-            "untracked": digest_files(root(), untracked),
+            "worktree": digest_files(root(), changed, ignored),
+            "untracked": digest_files(root(), untracked, ignored),
         }, sort_keys=True)
         return {"algorithm": "sha256", "value": hashlib.sha256(payload.encode("utf-8")).hexdigest(), "status": "ok"}
     except (OSError, subprocess.SubprocessError):
         if (root() / ".git").exists():
             return {"algorithm": "sha256", "value": "", "status": "unavailable"}
-        return non_git_fingerprint()
+        return non_git_fingerprint(ignored)
 
 
 def init(args: argparse.Namespace) -> int:
@@ -197,6 +219,23 @@ def prove(args: argparse.Namespace) -> int:
     return 2
 
 
+def stored_evidence_is_fresh(work_item: str, criterion_id: str) -> tuple[bool, str]:
+    """Read stored criterion evidence without executing command criteria."""
+    data = load(gate_path(work_item))
+    for criterion in validate(data):
+        if criterion["id"] != criterion_id:
+            continue
+        evidence = str(criterion.get("evidence", "")).strip()
+        stored = criterion.get("fingerprint")
+        current = fingerprint()
+        if not evidence or criterion.get("passes") is not True:
+            return False, "missing stored acceptance evidence"
+        if not isinstance(stored, dict) or stored.get("status") != "ok" or current.get("status") != "ok" or stored != current:
+            return False, "stale stored acceptance evidence"
+        return True, "fresh stored acceptance evidence"
+    return False, "missing stored acceptance criterion"
+
+
 def evaluate(criterion: dict) -> tuple[bool, str]:
     if criterion["kind"] == "manual":
         evidence = str(criterion.get("evidence", "")).strip()
@@ -208,7 +247,7 @@ def evaluate(criterion: dict) -> tuple[bool, str]:
         current = fingerprint()
         if stored.get("status") != "ok" or current.get("status") != "ok" or stored != current:
             return False, "stale manual evidence: re-prove required"
-        return bool(criterion.get("passes")), "manual evidence"
+        return criterion.get("passes") is True, "manual evidence"
     started = time.monotonic()
     criterion["checkedAt"] = now_utc()
     criterion["fingerprint"] = fingerprint()

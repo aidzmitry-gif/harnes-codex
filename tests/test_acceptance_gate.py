@@ -34,6 +34,32 @@ class AcceptanceGateTests(unittest.TestCase):
             {"id": "manual", "kind": "manual", "passes": True, "evidence": "old"}
         ))
 
+    @patch("acceptance_gate.fingerprint", return_value={"algorithm": "sha256", "value": "fresh", "status": "ok"})
+    @patch("acceptance_gate.load")
+    @patch("acceptance_gate.subprocess.run")
+    def test_stored_command_evidence_is_read_without_execution(self, run, mocked_load, _):
+        mocked_load.return_value = {"criteria": [{"id": "check", "kind": "command", "command": "raise-error", "passes": True, "evidence": "saved", "fingerprint": acceptance_gate.fingerprint()}]}
+        self.assertEqual((True, "fresh stored acceptance evidence"), acceptance_gate.stored_evidence_is_fresh("item", "check"))
+        run.assert_not_called()
+
+    @patch("acceptance_gate.fingerprint", return_value={"algorithm": "sha256", "value": "fresh", "status": "ok"})
+    @patch("acceptance_gate.load")
+    def test_stored_evidence_missing_or_stale_fails_closed(self, mocked_load, _):
+        mocked_load.return_value = {"criteria": [{"id": "check", "kind": "manual", "passes": True, "evidence": "", "fingerprint": acceptance_gate.fingerprint()}]}
+        self.assertEqual((False, "missing stored acceptance evidence"), acceptance_gate.stored_evidence_is_fresh("item", "check"))
+        mocked_load.return_value["criteria"][0].update({"evidence": "saved", "fingerprint": {"algorithm": "sha256", "value": "old", "status": "ok"}})
+        self.assertEqual((False, "stale stored acceptance evidence"), acceptance_gate.stored_evidence_is_fresh("item", "check"))
+
+    @patch("acceptance_gate.fingerprint", return_value={"algorithm": "sha256", "value": "fresh", "status": "ok"})
+    @patch("acceptance_gate.load")
+    def test_non_boolean_passes_never_opens_stored_evidence(self, mocked_load, _):
+        criterion = {"id": "check", "kind": "manual", "passes": "false", "evidence": "saved", "fingerprint": acceptance_gate.fingerprint()}
+        mocked_load.return_value = {"criteria": [criterion]}
+        self.assertEqual((False, "missing stored acceptance evidence"), acceptance_gate.stored_evidence_is_fresh("item", "check"))
+        criterion["passes"] = 1
+        self.assertEqual((False, "missing stored acceptance evidence"), acceptance_gate.stored_evidence_is_fresh("item", "check"))
+        self.assertFalse(acceptance_gate.evaluate(criterion)[0])
+
     @patch("acceptance_gate.save")
     @patch("acceptance_gate.fingerprint", return_value={"algorithm": "sha256", "value": "fresh", "status": "ok"})
     @patch("acceptance_gate.load")
@@ -82,6 +108,13 @@ class AcceptanceGateTests(unittest.TestCase):
         self.assertTrue(acceptance_gate.excluded(PurePosixPath(".harness/work/notes.md")))
         self.assertFalse(acceptance_gate.excluded(PurePosixPath(".harness/work/goal.passport.json")))
         self.assertFalse(acceptance_gate.excluded(PurePosixPath("src/credential_validator.py")))
+
+    def test_explicit_ignored_path_is_safe_and_narrow(self):
+        ignored = acceptance_gate.normalize_ignored_paths({".harness/work/goal.passport.json"})
+        self.assertTrue(acceptance_gate.excluded(PurePosixPath(".harness/work/goal.passport.json"), ignored))
+        self.assertFalse(acceptance_gate.excluded(PurePosixPath(".harness/work/other.passport.json"), ignored))
+        with self.assertRaises(ValueError):
+            acceptance_gate.normalize_ignored_paths({"../outside"})
 
     def test_sensitive_files_are_never_read_for_fingerprinting(self):
         sensitive = [".env.local", "secrets/key", "credentials.json", ".ssh/id_rsa", "config/private.pem"]

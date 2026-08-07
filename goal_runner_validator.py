@@ -7,6 +7,8 @@ import re
 import sys
 from pathlib import Path
 
+import acceptance_gate
+
 
 CHAIN_STATUSES = {"planning", "approved", "running", "verifying", "awaiting-user-review", "complete", "blocked"}
 SUBGOAL_STATUSES = {"planned", "ready", "running", "done", "blocked", "skipped"}
@@ -14,6 +16,40 @@ AGENT_STATUSES = {"planned", "orienting", "active", "done", "blocked"}
 EXECUTABLE_CHAIN_STATUSES = {"approved", "running", "verifying", "awaiting-user-review", "complete"}
 AUTH_SCOPES = {"successor creation", "bounded continuation", "both"}
 BOUNDED_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:+/@-]{0,63}$")
+FINGERPRINT = re.compile(r"^[0-9a-f]{64}$")
+MAX_GOAL_PROGRESS_ATTEMPTS = 256
+
+
+def validate_goal_progress(value: object) -> list[tuple[str, str]]:
+    """Validate the bounded durable no-progress state in an executable passport."""
+    if value is None:
+        return []
+    if not isinstance(value, dict) or set(value) != {"schemaVersion", "attempts"}:
+        return [("GOAL_PROGRESS", "goalProgress must contain only schemaVersion and attempts")]
+    if not isinstance(value.get("schemaVersion"), int) or isinstance(value.get("schemaVersion"), bool) or value.get("schemaVersion") != 1:
+        return [("GOAL_PROGRESS", "goalProgress.schemaVersion must be integer 1")]
+    attempts = value.get("attempts")
+    if not isinstance(attempts, list) or len(attempts) > MAX_GOAL_PROGRESS_ATTEMPTS:
+        return [("GOAL_PROGRESS", f"goalProgress.attempts must contain at most {MAX_GOAL_PROGRESS_ATTEMPTS} entries")]
+    required = {"chainId", "subgoalId", "strategyId", "repositoryFingerprint", "unlockEvidenceFingerprint"}
+    seen: set[str] = set()
+    for index, item in enumerate(attempts):
+        if not isinstance(item, dict) or set(item) != required:
+            return [("GOAL_PROGRESS", f"goalProgress.attempts[{index}] has invalid fields")]
+        for field in ("chainId", "subgoalId", "strategyId"):
+            if not isinstance(item.get(field), str) or not BOUNDED_ID.fullmatch(item[field]):
+                return [("GOAL_PROGRESS", f"goalProgress.attempts[{index}].{field} must be a bounded identifier")]
+        for field, statuses in (("repositoryFingerprint", {"ok"}), ("unlockEvidenceFingerprint", {"ok", "missing"})):
+            fingerprint = item[field]
+            if fingerprint is None and field == "unlockEvidenceFingerprint":
+                continue
+            if not isinstance(fingerprint, dict) or set(fingerprint) != {"algorithm", "status", "value"} or fingerprint.get("algorithm") != "sha256" or fingerprint.get("status") not in statuses or not isinstance(fingerprint.get("value"), str) or not FINGERPRINT.fullmatch(fingerprint["value"]):
+                return [("GOAL_PROGRESS", f"goalProgress.attempts[{index}].{field} must be a bounded sha256 fingerprint")]
+        signature = json.dumps(item, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+        if signature in seen:
+            return [("GOAL_PROGRESS", "goalProgress attempts must be unique")]
+        seen.add(signature)
+    return []
 
 
 def validate_passport(passport: object) -> list[tuple[str, str]]:
@@ -66,6 +102,7 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
         return sorted(errors)
     if root.get("schemaVersion") != 1:
         fail("SCHEMA_VERSION", "schemaVersion must be 1")
+    errors.extend(validate_goal_progress(root.get("goalProgress")))
     chain = mapping(root.get("chain"), "chain")
     subgoals = root.get("subgoals")
     agents = root.get("agents")
@@ -164,6 +201,16 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
         elif isinstance(item.get("ownedPaths"), list):
             for path_index, path in enumerate(item["ownedPaths"]):
                 portable_relative_path(path, f"subgoals[{index}].ownedPaths[{path_index}]")
+        unlock = item.get("unlockEvidence")
+        if unlock is not None:
+            if not isinstance(unlock, dict):
+                fail("UNLOCK_EVIDENCE", f"subgoals[{index}].unlockEvidence must be an object")
+            else:
+                work_item, criterion_id = unlock.get("workItem"), unlock.get("criterionId")
+                if not isinstance(work_item, str) or not work_item.replace("-", "").replace("_", "").isalnum():
+                    fail("UNLOCK_EVIDENCE", f"subgoals[{index}].unlockEvidence.workItem is invalid")
+                if not isinstance(criterion_id, str) or not BOUNDED_ID.fullmatch(criterion_id):
+                    fail("UNLOCK_EVIDENCE", f"subgoals[{index}].unlockEvidence.criterionId is invalid")
 
     def dependencies(item: dict) -> list[str]:
         return item.get("dependsOn") if isinstance(item.get("dependsOn"), list) else []
@@ -179,6 +226,17 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
             unfinished = [dep for dep in dependencies(item) if dep in by_id and by_id[dep].get("status") not in {"done", "skipped"}]
             if unfinished:
                 fail("SUBGOAL_READY", f"{identifier} has unfinished dependencies: {', '.join(sorted(unfinished))}")
+            unlock = item.get("unlockEvidence")
+            if isinstance(unlock, dict) and isinstance(unlock.get("workItem"), str) and isinstance(unlock.get("criterionId"), str):
+                skipped = [dep for dep in dependencies(item) if dep in by_id and by_id[dep].get("status") == "skipped" and (not isinstance(by_id[dep].get("skipReason"), str) or not by_id[dep]["skipReason"].strip())]
+                if skipped:
+                    fail("SUBGOAL_SKIP_REASON", f"{identifier} has skipped dependencies without skipReason: {', '.join(sorted(skipped))}")
+                try:
+                    fresh, note = acceptance_gate.stored_evidence_is_fresh(unlock["workItem"], unlock["criterionId"])
+                except (OSError, ValueError, json.JSONDecodeError) as exc:
+                    fresh, note = False, str(exc)
+                if not fresh:
+                    fail("UNLOCK_EVIDENCE", f"{identifier} unlock evidence is not fresh: {note}")
 
     visiting: set[str] = set()
     visited: set[str] = set()

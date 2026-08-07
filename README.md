@@ -60,6 +60,15 @@ python .\harness_metrics.py record --file .harness\metrics\<chain>.jsonl --from 
 python .\harness_metrics.py compare --file .harness\metrics\<chain>.jsonl --baseline baseline --treatment treatment
 ```
 
+Для повторной попытки одной подцели проверьте, что появилось наблюдаемое изменение. `goal_progress.py` хранит только ограниченную сигнатуру: ID цепочки/подцели/стратегии, fingerprint репозитория и структурированный fingerprint evidence. Одинаковая сигнатура завершится с `NO_PROGRESS`; новый текст в поле evidence не является новым прогрессом.
+
+```powershell
+python .\goal_progress.py check .harness\work\<chain>.passport.json <subgoal-id> <strategy-id>
+python .\goal_progress.py record .harness\work\<chain>.passport.json <subgoal-id> <strategy-id>
+```
+
+Исполняемый passport — это control DAG: только он открывает зависимости, назначает ownership и хранит состояние попыток. Graphify — отдельный локальный knowledge graph для поиска связей. Его вывод не меняет статус passport и сам по себе не является acceptance evidence: для перехода всё равно нужна свежая проверка или доказательство, зафиксированные в acceptance gate.
+
 Сравнение имеет смысл только при валидных парах. Текущий in-memory compare ограничен 50 000 `pairKey`: локальный замер HRE-001 обработал этот предел за 1,763 с с пиком 54,06 MiB; при превышении архивируйте JSONL либо переходите на SQLite-индекс. Локальный benchmark — регрессионный оракул общей семантики качества, а не доказательство экономии токенов в реальных проектах или статистической значимости:
 
 ```powershell

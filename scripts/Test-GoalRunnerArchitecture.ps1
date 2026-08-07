@@ -15,6 +15,7 @@ $acceptanceTemplate = Join-Path $root 'templates\acceptance.goal-runner.json'
 $passport = Join-Path $root 'templates\goal-passport.example.json'
 $benchmarkFixture = Join-Path $root 'tests\fixtures\hre-001-benchmark.json'
 $configFixture = Join-Path $root 'templates\codex.config.fixture.toml'
+$goalProgress = Join-Path $root 'goal_progress.py'
 
 $pythonCheck = @'
 import json, sys, tomllib
@@ -56,7 +57,7 @@ print(json.dumps({'cap': agents['max_concurrent_threads_per_session'], 'roles': 
 & python -c $pythonCheck $root
 if ($LASTEXITCODE -ne 0) { throw 'TOML and acceptance architecture validation failed.' }
 
-foreach ($path in @($config, $skill, $goalState, $ladder, $handoff, $reminder, $installer, $uninstaller, $acceptanceTemplate, $passport, $benchmarkFixture, $configFixture)) {
+foreach ($path in @($config, $skill, $goalState, $ladder, $handoff, $reminder, $installer, $uninstaller, $acceptanceTemplate, $passport, $benchmarkFixture, $configFixture, $goalProgress)) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing required file: $path" }
 }
 
@@ -89,12 +90,20 @@ $requiredSkillPatterns = @(
     'At meaningful run or accepted-subgoal checkpoints only',
     'It does not prove real-world token savings or statistical significance',
     'Acceptance evidence is fresh only for the current relevant repository state',
+    'NO_PROGRESS',
+    'Control DAG and Graphify are separate',
+    'Graphify output is not acceptance evidence by itself',
     'carry only the treatment ID, metrics path/schema'
 )
 foreach ($pattern in $requiredSkillPatterns) {
     if (-not $skillText.Contains($pattern)) { throw "Goal Runner contract missing: $pattern" }
 }
 if ($skillText.Contains('TODO')) { throw 'Goal Runner skill still contains TODO.' }
+
+$readmeText = Get-Content -LiteralPath (Join-Path $root 'README.md') -Raw
+foreach ($pattern in @('goal_progress.py check', 'NO_PROGRESS', 'control DAG', 'Graphify', 'acceptance evidence')) {
+    if (-not $readmeText.Contains($pattern)) { throw "README control-evidence contract missing: $pattern" }
+}
 
 $requiredStatePatterns = @(
     'Project root:',
