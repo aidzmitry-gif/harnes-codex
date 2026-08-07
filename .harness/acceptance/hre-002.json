@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 2,
+  "workItem": "hre-002",
+  "criteria": [
+    {
+      "id": "runtime-tests",
+      "kind": "command",
+      "description": "The local unit suite covers fresh evidence, bounded no-progress state and executable-plan validation.",
+      "command": "python -m unittest discover -s tests -v",
+      "checkedAt": "2026-08-07T16:15:52.548611+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "b55af4e015d94a7217e19c550d0b393c635c73b7f19524734b28131febdabca4",
+        "status": "ok"
+      },
+      "passes": true,
+      "evidence": "auto: exit 0; PASS new attempt signature",
+      "durationMs": 3891
+    },
+    {
+      "id": "architecture",
+      "kind": "command",
+      "description": "The Goal Runner architecture includes the control-DAG versus Graphify boundary.",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-GoalRunnerArchitecture.ps1",
+      "checkedAt": "2026-08-07T16:15:56.434125+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "b55af4e015d94a7217e19c550d0b393c635c73b7f19524734b28131febdabca4",
+        "status": "ok"
+      },
+      "passes": true,
+      "evidence": "auto: exit 0; PASS Goal Runner architecture contract is internally consistent.",
+      "durationMs": 984
+    },
+    {
+      "id": "release-gate",
+      "kind": "command",
+      "description": "The strict local release gate passes without external actions.",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-HarnessGate.ps1 -Stage release -Strict",
+      "checkedAt": "2026-08-07T16:15:57.424091+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "b55af4e015d94a7217e19c550d0b393c635c73b7f19524734b28131febdabca4",
+        "status": "ok"
+      },
+      "passes": true,
+      "evidence": "auto: exit 0; PASS Harness gate 'release' passed.",
+      "durationMs": 21516
+    },
+    {
+      "id": "independent-review",
+      "kind": "manual",
+      "description": "A fresh independent correctness and simplify review accepted the implementation after reproducing the negative paths.",
+      "evidence": "Independent G04 verifier accepted revision-2 corrective checks at commit b1ff36a; final G05 suite and release gate passed.",
+      "passes": true,
+      "checkedAt": "2026-08-07T16:15:52.018078+00:00",
+      "durationMs": 0,
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "b55af4e015d94a7217e19c550d0b393c635c73b7f19524734b28131febdabca4",
+        "status": "ok"
+      }
+    }
+  ]
+}

@@ -39,8 +39,8 @@
 - Commit policy: isolated-worker checkpoints after acceptance; no push
 - Current laziness-ladder rung: 2 — Python stdlib and existing acceptance fingerprint helper
 - Rejected lower rungs: YAGNI fails because evidence-bound dependencies and no-progress were explicitly approved; direct documentation cannot mechanically reject an unsafe transition
-- Current verified subgoal: G02 — revision-2 targeted tests cover and close the four G04 findings
-- Next minimal slice and acceptance check: G04 retry independently reproduces the former defects and completes correctness then simplify review
+- Current verified subgoal: G05 — HRE-002 acceptance, full suite and strict release gate passed
+- Next minimal slice and acceptance check: await user review; archive only after an explicit chain command
 - Executable plan snapshot: `.harness/work/hre-002.passport.json`
 - Measurement treatment IDs: baseline `status-only-v1` | treatment `evidence-progress-v1`
 - Metrics path/schema: `.harness/metrics/hre-002.jsonl` / schema 1
@@ -56,8 +56,8 @@
 | G01 | Optional `unlockEvidence` проверяет stored fresh evidence без запуска команд; stale/missing evidence и необоснованный `skipped` не открывают потомка; v1 compatibility сохранена | P0 | 2 | `acceptance_gate.py`, `goal_runner_validator.py`, tests, fixture/template | medium | worker / terra | done | targeted tests + compatibility suite |
 | G02 | `goal_progress.py` распознаёт одинаковую попытку как `no_progress`; новая strategy/evidence/fingerprint допускает следующую попытку; passport хранит только bounded state | G01 | 3 | acceptance/progress/validator и их tests | medium | primary / sol | done | 46 targeted tests close G04 findings; fresh independent review remains G04 |
 | G03 | Goal Runner docs и example passport различают control DAG и Graphify knowledge graph; Graphify без свежего покрытия не является acceptance evidence | G01,G02 | 4 | skill docs, README, architecture test | low | primary / sol | done | architecture test + diff review |
-| G04 | Независимый read-only verifier воспроизводит негативные сценарии и выполняет correctness затем simplify review | G01,G02,G03 | 5 | read-only integration tree | medium | verifier / sol | running | fresh reproduced checks and report after G02 correction |
-| G05 | Fresh HRE-002 acceptance, full suite и strict release подтверждают интегрированный результат | G04 | 6 | primary / acceptance and journal | medium | primary / sol | planned | all criteria fresh PASS; strict release PASS |
+| G04 | Независимый read-only verifier воспроизводит негативные сценарии и выполняет correctness затем simplify review | G01,G02,G03 | 5 | read-only integration tree | medium | verifier / sol | done | final verifier accepted 46 targeted tests, passport and architecture checks |
+| G05 | Fresh HRE-002 acceptance, full suite и strict release подтверждают интегрированный результат | G04 | 6 | primary / acceptance and journal | medium | primary / sol | done | fresh acceptance PASS; 57 tests; strict release PASS |
 
 ## Agent registry
 
@@ -68,7 +68,7 @@
 | `hre002-g02-recovery` | G02 | worker / terra-medium | `.worktrees/hre-002-g02` | done | Ten focused tests and diff check passed; primary independently reproduced the results before integration. |
 | `hre002-g04-verifier` | G04 | verifier / sol-high | read-only integration tree | done/reject | Found three correctness defects and one validator coverage gap; no source files modified. |
 | `hre002-g04-retry-verifier` | G04 | verifier / sol-high | read-only integration tree | done/reject | Closed four former findings and isolated the float schema-version type defect. |
-| `hre002-g04-final-verifier` | G04 | verifier / sol-high | read-only integration tree | active | Final short verifier run after the schema-version type correction. |
+| `hre002-g04-final-verifier` | G04 | verifier / sol-high | read-only integration tree | done/accept | Final correctness and simplify review accepted after the schema-version type correction. |
 
 ## План проверок
 
@@ -92,3 +92,5 @@
 | 2026-08-07 | G04 independent verifier | REJECT | Self-record changed the next repository fingerprint; `passes` truthiness accepted non-bool values; attempt limit allowed 257th write; shared validator ignored `goalProgress`. Revision 2 corrects these defects without expanding the parent outcome. |
 | 2026-08-07 | G02 revision-2 correction | PASS (targeted) | 46 focused tests cover self-state exclusion while retaining other passport changes, strict boolean `passes`, exact 256 boundary and shared `goalProgress` schema validation. |
 | 2026-08-07 | G04 retry verifier | REJECT | Four prior findings closed, but `goalProgress.schemaVersion: 1.0` was accepted as integer 1. Corrected with an explicit integer check and a regression test; final verifier remains required. |
+| 2026-08-07 | G04 final verifier | PASS | Correctness and simplify passes found no blockers: strict schema, self-state exclusion, evidence boolean, bounded limit and non-execution invariants reproduced. |
+| 2026-08-07 | G05 final acceptance | PASS | `hre-002` acceptance criteria passed fresh; full suite 57/57, architecture and strict local release gate passed. The only residual environment artifact is an inaccessible empty test temporary directory, excluded from tracked changes. |
