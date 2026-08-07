@@ -7,57 +7,57 @@
       "kind": "command",
       "description": "The local unit suite covers fresh evidence, bounded no-progress state and executable-plan validation.",
       "command": "python -m unittest discover -s tests -v",
-      "checkedAt": "2026-08-07T16:17:34.913004+00:00",
+      "checkedAt": "2026-08-07T18:06:27.166535+00:00",
       "fingerprint": {
         "algorithm": "sha256",
-        "value": "2e5e166b1f462f6af6437ab3e6431daa7fddf16f82711f8811ff0eb5c6e03c66",
+        "value": "9a0d03adc3d425f84d5a50d4d1ec160312df9a85a6c8b57a8c67bd97130dee1b",
         "status": "ok"
       },
       "passes": true,
       "evidence": "auto: exit 0; PASS new attempt signature",
-      "durationMs": 3781
+      "durationMs": 3938
     },
     {
       "id": "architecture",
       "kind": "command",
       "description": "The Goal Runner architecture includes the control-DAG versus Graphify boundary.",
       "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-GoalRunnerArchitecture.ps1",
-      "checkedAt": "2026-08-07T16:17:38.681086+00:00",
+      "checkedAt": "2026-08-07T18:06:31.108901+00:00",
       "fingerprint": {
         "algorithm": "sha256",
-        "value": "2e5e166b1f462f6af6437ab3e6431daa7fddf16f82711f8811ff0eb5c6e03c66",
+        "value": "9a0d03adc3d425f84d5a50d4d1ec160312df9a85a6c8b57a8c67bd97130dee1b",
         "status": "ok"
       },
       "passes": true,
       "evidence": "auto: exit 0; PASS Goal Runner architecture contract is internally consistent.",
-      "durationMs": 1141
+      "durationMs": 1172
     },
     {
       "id": "release-gate",
       "kind": "command",
       "description": "The strict local release gate passes without external actions.",
       "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-HarnessGate.ps1 -Stage release -Strict",
-      "checkedAt": "2026-08-07T16:17:39.825107+00:00",
+      "checkedAt": "2026-08-07T18:06:32.284048+00:00",
       "fingerprint": {
         "algorithm": "sha256",
-        "value": "2e5e166b1f462f6af6437ab3e6431daa7fddf16f82711f8811ff0eb5c6e03c66",
+        "value": "9a0d03adc3d425f84d5a50d4d1ec160312df9a85a6c8b57a8c67bd97130dee1b",
         "status": "ok"
       },
       "passes": true,
       "evidence": "auto: exit 0; PASS Harness gate 'release' passed.",
-      "durationMs": 22125
+      "durationMs": 20500
     },
     {
       "id": "independent-review",
       "kind": "manual",
       "description": "A fresh independent correctness and simplify review accepted the implementation after reproducing the negative paths.",
-      "evidence": "Independent G04 verifier accepted revision-2 corrective checks at commit b1ff36a; final G05 suite and release gate passed.",
+      "evidence": "Independent G04 verifier accepted the corrective checks; HRE-002 is present in the current evidence-first-rules branch with the user AGENTS.md baseline.",
       "passes": true,
-      "checkedAt": "2026-08-07T16:16:55.809770+00:00",
+      "checkedAt": "2026-08-07T18:07:01.663536+00:00",
       "durationMs": 0,
       "fingerprint": {
         "algorithm": "sha256",
-        "value": "2e5e166b1f462f6af6437ab3e6431daa7fddf16f82711f8811ff0eb5c6e03c66",
+        "value": "9a0d03adc3d425f84d5a50d4d1ec160312df9a85a6c8b57a8c67bd97130dee1b",
         "status": "ok"
       }
     }
