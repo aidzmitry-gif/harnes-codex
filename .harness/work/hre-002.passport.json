@@ -17,8 +17,8 @@
     "delegationDepthCap": 1,
     "standingChainAuthorization": "approved",
     "standingAuthorizationScope": "bounded continuation",
-    "currentVerifiedSubgoal": "G01",
-    "nextMinimalSliceAcceptance": "G02 orientation acknowledgement, then focused no-progress tests and a validator check.",
+    "currentVerifiedSubgoal": "G02",
+    "nextMinimalSliceAcceptance": "G03: document the required separation between the control DAG and Graphify, then run the architecture check.",
     "baselineId": "status-only-v1",
     "treatmentId": "evidence-progress-v1",
     "metricsPath": ".harness/metrics/hre-002.jsonl",
@@ -49,7 +49,7 @@
       "id": "G02",
       "dependsOn": ["G01"],
       "wave": 3,
-      "status": "ready",
+      "status": "done",
       "execution": "subagent",
       "model": "terra",
       "worktree": ".worktrees/hre-002-g02",
@@ -96,6 +96,26 @@
       "writer": true,
       "worktree": ".worktrees/hre-002-g01",
       "ownedPaths": ["acceptance_gate.py", "goal_runner_validator.py", "tests/test_acceptance_gate.py", "tests/test_goal_runner_validator.py", "tests/fixtures/valid_goal_passport.json", "templates/goal-passport.example.json"]
+    },
+    {
+      "id": "hre002-g02-worker",
+      "subgoalId": "G02",
+      "role": "harness_goal_worker",
+      "depth": 1,
+      "status": "blocked",
+      "writer": true,
+      "worktree": ".worktrees/hre-002-g02",
+      "ownedPaths": ["goal_progress.py", "tests/test_goal_progress.py"]
+    },
+    {
+      "id": "hre002-g02-recovery",
+      "subgoalId": "G02",
+      "role": "harness_goal_worker",
+      "depth": 1,
+      "status": "done",
+      "writer": true,
+      "worktree": ".worktrees/hre-002-g02",
+      "ownedPaths": ["goal_progress.py", "tests/test_goal_progress.py"]
     }
   ]
 }
