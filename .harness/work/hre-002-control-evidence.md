@@ -1,0 +1,73 @@
+# Work item: HRE-002 — Evidence-bound control flow
+
+## Цель
+
+- Проблема: Goal Runner проверяет структуру DAG, но статус `done`/`skipped` сам по себе разблокирует потомка; повторная попытка может не отличаться от предыдущей наблюдаемым состоянием.
+- Ожидаемый исход: зависимость открывается только свежим локально проверяемым evidence, а повтор с тем же состоянием, evidence и стратегией останавливается как `no_progress`.
+- Не входит: LangGraph/внешние сервисы, LLM-as-judge, сеть, push, deploy, миграции, секреты, изменение пользовательского `AGENTS.md`, обещания экономии токенов.
+
+## Контракт и инварианты
+
+- `unlockEvidence` остаётся обратносуместимым: старые паспорта v1 действительны; новый контракт используется только там, где он явно указан.
+- Freshness проверяется на текущем repository fingerprint; проверка не запускает произвольные acceptance commands и не читает sensitive files.
+- `skipped` не открывает evidence-bound ребро без явной причины, записанной в паспорте.
+- `no_progress` определяется только по ограниченным структурированным полям: chain/subgoal, strategy ID, repository fingerprint и evidence fingerprint. Он не сохраняет transcript, секреты или свободный текст.
+- Единственный narrative journal — этот work item; машинное состояние попыток остаётся в executable passport.
+- Один writer на worktree; `AGENTS.md` основного checkout принадлежит пользователю и не входит в ownership этой цепочки.
+
+## Карта воздействия
+
+- Компоненты: `acceptance_gate.py` (fresh evidence helper), `goal_runner_validator.py` (schema и pure validation), новый минимальный `goal_progress.py` (структурированный no-progress CLI), их unit tests, Goal Runner docs и example passport.
+- Потребители: primary orchestrator, worker, read-only verifier и проекты, использующие Goal Runner.
+- Данные: passport JSON и acceptance JSON; только bounded IDs, hashes и статусы.
+- Безопасность: без запуска command criteria из validator/progress gate; без чтения `.env`/credentials; нет сетевого доступа.
+- Откат: локальные атомарные checkpoints в изолированных worktree; revert конкретного commit. Push запрещён.
+
+## Goal runner state
+
+- Chain ID: HRE-002
+- Project root: `D:\6 Проекты\Харнес разработка`
+- Data owner: пользователь — владелец workspace
+- Risk class: medium
+- External-side-effect boundary: local-only; no network, push, deploy, migration, deletion, or secrets
+- Parent outcome: evidence-bound DAG transitions and a local no-progress stop condition
+- Status: approved
+- Plan revision: 1
+- Approved passport revision: 1
+- Approval provenance: current task; user message `Подтверждаю HRE-002 revision 1; AGENTS.md оставить моим baseline и не трогать.`; 2026-08-07 Europe/Minsk
+- Checkout/worktree policy: clean integration worktree; one writer per isolated worker worktree; primary serializes integration
+- Commit policy: isolated-worker checkpoints after acceptance; no push
+- Current laziness-ladder rung: 2 — Python stdlib and existing acceptance fingerprint helper
+- Rejected lower rungs: YAGNI fails because evidence-bound dependencies and no-progress were explicitly approved; direct documentation cannot mechanically reject an unsafe transition
+- Current verified subgoal: P0 — clean isolated baseline and prechange PASS
+- Next minimal slice and acceptance check: G01 orientation acknowledgement, then targeted validator/acceptance tests
+- Executable plan snapshot: `.harness/work/hre-002.passport.json`
+- Measurement treatment IDs: baseline `status-only-v1` | treatment `evidence-progress-v1`
+- Metrics path/schema: `.harness/metrics/hre-002.jsonl` / schema 1
+- Global agent cap: 2; delegation depth: 1; active agents: 0
+- Standing chain authorization: approved; scope: bounded continuation
+- Archive policy: final explicit command only
+
+## Подцели
+
+| ID | Результат | Depends on | Wave | Ownership | Risk | Execution/model | Status | Acceptance |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| P0 | Чистый integration worktree и prechange evidence без затрагивания пользовательского `AGENTS.md` | none | 1 | primary / environment | low | primary / sol | done | clean worktree at `1246c59`; prechange PASS |
+| G01 | Optional `unlockEvidence` проверяет stored fresh evidence без запуска команд; stale/missing evidence и необоснованный `skipped` не открывают потомка; v1 compatibility сохранена | P0 | 2 | `acceptance_gate.py`, `goal_runner_validator.py`, tests, fixture/template | medium | worker / terra | ready | targeted tests + compatibility suite |
+| G02 | `goal_progress.py` распознаёт одинаковую попытку как `no_progress`; новая strategy/evidence/fingerprint допускает следующую попытку; passport хранит только bounded state | G01 | 3 | `goal_progress.py`, tests | medium | worker / terra | planned | targeted tests + validator check |
+| G03 | Goal Runner docs и example passport различают control DAG и Graphify knowledge graph; Graphify без свежего покрытия не является acceptance evidence | G01,G02 | 4 | skill docs, README, architecture test | low | primary / sol | planned | architecture test + diff review |
+| G04 | Независимый read-only verifier воспроизводит негативные сценарии и выполняет correctness затем simplify review | G01,G02,G03 | 5 | read-only integration tree | medium | verifier / sol | planned | reproduced checks and report |
+| G05 | Fresh HRE-002 acceptance, full suite и strict release подтверждают интегрированный результат | G04 | 6 | primary / acceptance and journal | medium | primary / sol | planned | all criteria fresh PASS; strict release PASS |
+
+## План проверок
+
+1. `python -m unittest tests.test_acceptance_gate tests.test_goal_runner_validator -v` для G01.
+2. `python -m unittest tests.test_goal_progress -v` и `python goal_runner_validator.py check .harness/work/hre-002.passport.json` для G02.
+3. `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-GoalRunnerArchitecture.ps1` для G03.
+4. Полный `python -m unittest discover -s tests -v`, затем `scripts/Invoke-HarnessGate.ps1 -Stage release -Strict` для G05.
+
+## Журнал доказательств
+
+| Время | Проверка | Результат | Вывод |
+| --- | --- | --- | --- |
+| 2026-08-07 | P0: clean `codex/hre-002-control-evidence` worktree from `1246c59`; `Invoke-HarnessGate.ps1 -Stage prechange` | PASS; 38 tests | User-owned `AGENTS.md` remains only in the main checkout and is untouched. |

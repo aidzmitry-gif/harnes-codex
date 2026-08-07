@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "chain": {
+    "chainId": "HRE-002",
+    "projectRoot": "D:\\6 Проекты\\Харнес разработка",
+    "dataOwner": "workspace-owner",
+    "riskClass": "medium",
+    "externalSideEffectBoundary": "local-only; no network, push, deploy, migration, deletion, or secrets",
+    "parentOutcome": "Evidence-bound Goal Runner transitions and a local no-progress stop condition.",
+    "status": "approved",
+    "planRevision": 1,
+    "approvedPassportRevision": 1,
+    "approvalProvenance": "current task; user approved HRE-002 revision 1 on 2026-08-07 Europe/Minsk",
+    "canonicalWorkItemPath": ".harness/work/hre-002-control-evidence.md",
+    "checkoutWorktreePolicy": "one writer per clean isolated worktree; primary integrates",
+    "globalAgentCap": 2,
+    "delegationDepthCap": 1,
+    "standingChainAuthorization": "approved",
+    "standingAuthorizationScope": "bounded continuation",
+    "currentVerifiedSubgoal": "P0",
+    "nextMinimalSliceAcceptance": "Worker acknowledges G01 ownership and runs targeted acceptance and validator tests after the minimal change.",
+    "baselineId": "status-only-v1",
+    "treatmentId": "evidence-progress-v1",
+    "metricsPath": ".harness/metrics/hre-002.jsonl",
+    "metricsSchemaVersion": 1
+  },
+  "subgoals": [
+    {
+      "id": "P0",
+      "dependsOn": [],
+      "wave": 1,
+      "status": "done",
+      "execution": "primary",
+      "model": "sol",
+      "worktree": null,
+      "ownedPaths": []
+    },
+    {
+      "id": "G01",
+      "dependsOn": ["P0"],
+      "wave": 2,
+      "status": "ready",
+      "execution": "subagent",
+      "model": "terra",
+      "worktree": ".worktrees/hre-002-g01",
+      "ownedPaths": ["acceptance_gate.py", "goal_runner_validator.py", "tests/test_acceptance_gate.py", "tests/test_goal_runner_validator.py", "tests/fixtures/valid_goal_passport.json", "templates/goal-passport.example.json"]
+    },
+    {
+      "id": "G02",
+      "dependsOn": ["G01"],
+      "wave": 3,
+      "status": "planned",
+      "execution": "subagent",
+      "model": "terra",
+      "worktree": ".worktrees/hre-002-g02",
+      "ownedPaths": ["goal_progress.py", "tests/test_goal_progress.py"]
+    },
+    {
+      "id": "G03",
+      "dependsOn": ["G01", "G02"],
+      "wave": 4,
+      "status": "planned",
+      "execution": "primary",
+      "model": "sol",
+      "worktree": null,
+      "ownedPaths": [".agents/skills/goal-runner/SKILL.md", "README.md", "scripts/Test-GoalRunnerArchitecture.ps1"]
+    },
+    {
+      "id": "G04",
+      "dependsOn": ["G01", "G02", "G03"],
+      "wave": 5,
+      "status": "planned",
+      "execution": "subagent",
+      "model": "sol",
+      "worktree": null,
+      "ownedPaths": []
+    },
+    {
+      "id": "G05",
+      "dependsOn": ["G04"],
+      "wave": 6,
+      "status": "planned",
+      "execution": "primary",
+      "model": "sol",
+      "worktree": null,
+      "ownedPaths": [".harness/work/hre-002-control-evidence.md", ".harness/work/hre-002.passport.json", ".harness/acceptance/hre-002.json"]
+    }
+  ],
+  "agents": []
+}
