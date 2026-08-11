@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "chain": {
+    "chainId": "HRE-003",
+    "projectRoot": "D:\\6 Проекты\\Харнес разработка",
+    "dataOwner": "workspace-owner",
+    "riskClass": "medium",
+    "externalSideEffectBoundary": "local-only; no network, push, deploy, migration, deletion, global install, or secrets",
+    "parentOutcome": "Read-only Parent Goal action planner plus an evidence-separated significant-update radar.",
+    "status": "running",
+    "planRevision": 1,
+    "approvedPassportRevision": 1,
+    "approvalProvenance": "task 019fca39-7a3e-7a90-a726-a47e3c72dc19; explicit user approval of HRE-003 revision 1 on 2026-08-11 Europe/Minsk; AGENTS.md unchanged and no push",
+    "canonicalWorkItemPath": ".harness/work/hre-003-autopilot-updates.md",
+    "checkoutWorktreePolicy": "one writer per clean isolated worktree; primary integrates",
+    "globalAgentCap": 2,
+    "delegationDepthCap": 1,
+    "standingChainAuthorization": "approved",
+    "standingAuthorizationScope": "bounded continuation",
+    "currentVerifiedSubgoal": "P0",
+    "nextMinimalSliceAcceptance": "Match G01 and G02 orientation acknowledgements, revalidate immediately before writes, then authorize the isolated minimal slices.",
+    "baselineId": "manual-goal-updates-v1",
+    "treatmentId": "autopilot-radar-v1",
+    "metricsPath": ".harness/metrics/hre-003.jsonl",
+    "metricsSchemaVersion": 1
+  },
+  "subgoals": [
+    {
+      "id": "P0",
+      "dependsOn": [],
+      "wave": 1,
+      "status": "done",
+      "execution": "primary",
+      "model": "sol",
+      "worktree": null,
+      "ownedPaths": [
+        ".harness/work/hre-003-autopilot-updates.md",
+        ".harness/work/hre-003.passport.json"
+      ]
+    },
+    {
+      "id": "G01",
+      "dependsOn": ["P0"],
+      "wave": 2,
+      "status": "ready",
+      "execution": "subagent",
+      "model": "terra",
+      "worktree": ".worktrees/hre-003-g01",
+      "ownedPaths": [
+        "goal_orchestrator.py",
+        "tests/test_goal_orchestrator.py"
+      ]
+    },
+    {
+      "id": "G02",
+      "dependsOn": ["P0"],
+      "wave": 2,
+      "status": "ready",
+      "execution": "subagent",
+      "model": "terra",
+      "worktree": ".worktrees/hre-003-g02",
+      "ownedPaths": [
+        "update_impact.py",
+        "tests/test_update_impact.py",
+        "templates/update-candidate.example.json"
+      ]
+    },
+    {
+      "id": "G03",
+      "dependsOn": ["G01", "G02"],
+      "wave": 3,
+      "status": "planned",
+      "execution": "primary",
+      "model": "sol",
+      "worktree": null,
+      "ownedPaths": [
+        ".agents/skills/goal-runner/SKILL.md",
+        "README.md",
+        "scripts/Test-GoalRunnerArchitecture.ps1"
+      ]
+    },
+    {
+      "id": "G04",
+      "dependsOn": ["G01", "G02", "G03"],
+      "wave": 4,
+      "status": "planned",
+      "execution": "subagent",
+      "model": "sol",
+      "worktree": null,
+      "ownedPaths": []
+    },
+    {
+      "id": "G05",
+      "dependsOn": ["G04"],
+      "wave": 5,
+      "status": "planned",
+      "execution": "primary",
+      "model": "sol",
+      "worktree": null,
+      "ownedPaths": [
+        ".harness/work/hre-003-autopilot-updates.md",
+        ".harness/work/hre-003.passport.json",
+        ".harness/acceptance/hre-003.json",
+        "harness.config.json"
+      ]
+    }
+  ],
+  "agents": [
+    {
+      "id": "hre003-g01-worker",
+      "subgoalId": "G01",
+      "role": "harness_goal_worker",
+      "depth": 1,
+      "status": "orienting",
+      "writer": true,
+      "worktree": ".worktrees/hre-003-g01",
+      "ownedPaths": [
+        "goal_orchestrator.py",
+        "tests/test_goal_orchestrator.py"
+      ]
+    },
+    {
+      "id": "hre003-g02-worker",
+      "subgoalId": "G02",
+      "role": "harness_goal_worker",
+      "depth": 1,
+      "status": "orienting",
+      "writer": true,
+      "worktree": ".worktrees/hre-003-g02",
+      "ownedPaths": [
+        "update_impact.py",
+        "tests/test_update_impact.py",
+        "templates/update-candidate.example.json"
+      ]
+    }
+  ]
+}
