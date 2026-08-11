@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 2,
+  "workItem": "hre-003",
+  "criteria": [
+    {
+      "id": "runtime-tests",
+      "kind": "command",
+      "description": "The complete local unit suite covers the integrated Harness behavior.",
+      "command": "python -m unittest discover -s tests -v"
+    },
+    {
+      "id": "hre003-passport",
+      "kind": "command",
+      "description": "The final HRE-003 executable passport is valid.",
+      "command": "python goal_runner_validator.py check .harness/work/hre-003.passport.json"
+    },
+    {
+      "id": "autopilot-radar",
+      "kind": "command",
+      "description": "Planner, progress, validator and update-radar contracts pass their focused local regression set.",
+      "command": "python -m unittest tests.test_goal_orchestrator tests.test_goal_progress tests.test_goal_runner_validator tests.test_update_impact -v"
+    },
+    {
+      "id": "architecture",
+      "kind": "command",
+      "description": "Goal Runner architecture and the new local planner/radar wiring are internally consistent.",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-GoalRunnerArchitecture.ps1"
+    },
+    {
+      "id": "release-gate",
+      "kind": "command",
+      "description": "The strict local release gate passes without external actions.",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-HarnessGate.ps1 -Stage release -Strict"
+    },
+    {
+      "id": "independent-review",
+      "kind": "manual",
+      "description": "Independent correctness, security and simplify review accepted all HRE-003 trust boundaries after reproducing negative oracles.",
+      "evidence": ""
+    }
+  ]
+}

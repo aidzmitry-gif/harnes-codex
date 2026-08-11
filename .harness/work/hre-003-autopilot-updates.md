@@ -54,7 +54,7 @@
 - Risk class: medium
 - External-side-effect boundary: local-only; no network, push, deploy, migration, deletion, global install, or secrets
 - Parent outcome: read-only Parent Goal action planner plus evidence-separated significant-update radar
-- Status: running
+- Status: awaiting-user-review
 - Plan revision: 5
 - Approved passport revision: 5
 - Approval provenance: task `019fca39-7a3e-7a90-a726-a47e3c72dc19`; revision 1 explicitly approved by the user on 2026-08-11 Europe/Minsk; revisions 2 through 5 are bounded corrective waves after independent reviews with parent outcome, owner, risk, external boundary, `AGENTS.md` exclusion and no-push boundary unchanged
@@ -62,8 +62,8 @@
 - Commit policy: isolated-worker checkpoints after acceptance; primary integration; no push
 - Current laziness-ladder rung: 2 — Python stdlib plus existing validator/JSON contracts
 - Rejected lower rungs: YAGNI fails because orchestration and update filtering are explicitly requested; documentation alone cannot mechanically reject unsafe launch plans or untrusted/noisy update records
-- Current verified subgoal: G15 — independent totality, public-boundary, correctness and simplify review returned ACCEPT
-- Next minimal slice and acceptance check: planner identifies G05 as the only launch action; G05 runs full, postchange, strict release and fresh fingerprint-bound acceptance after the final state commit
+- Current verified subgoal: G05 — full, postchange and strict release gates passed on the accepted local implementation
+- Next minimal slice and acceptance check: user reviews the local branch and fresh fingerprint-bound acceptance evidence; no push or archive without an explicit command
 - Executable plan snapshot: `.harness/work/hre-003.passport.json`
 - Measurement treatment IDs: baseline `manual-goal-updates-v1` | treatment `autopilot-radar-v1`
 - Metrics path/schema: `.harness/metrics/hre-003.jsonl` / schema 1
@@ -90,7 +90,7 @@
 | G13 | Independent trust-boundary verification plus final correctness and simplify passes | G12 | 11 | read-only integrated tree | medium | verifier / sol-high | done | REJECT; pure-validator enum/fingerprint TypeErrors opened G14/G15 |
 | G14 | Pure passport validation is total for JSON-compatible enum/fingerprint shapes; C1 URL controls are rejected | G13 | 13 | validator, classifier and targeted tests | medium | worker / terra | done | table-driven direct fuzz returns stable codes; `goal_progress.py record` fails closed/no-write; C1 controls reject |
 | G15 | Independent total-function and final correctness/simplify verification | G14 | 14 | read-only integrated tree | medium | verifier / sol-high | done | ACCEPT; 20/20 fuzz, public CLIs, 62 targeted and 89 full tests, architecture and simplify review passed |
-| G05 | Fresh acceptance, full suite and strict release prove the integrated HRE-003 result | G15 | 15 | primary / acceptance and journal | medium | primary / sol | running | targeted, full, architecture and strict release PASS |
+| G05 | Fresh acceptance, full suite and strict release prove the integrated HRE-003 result | G15 | 15 | primary / acceptance and journal | medium | primary / sol | done | 89 full tests, postchange, architecture, installer and strict release PASS; acceptance is re-proved after the final relevant commit |
 
 ## План проверок
 
@@ -150,3 +150,4 @@
 | 2026-08-11 | Planner transition to G15 | PASS | After G14 completion the planner returned exactly one `launch` action for G15; the passport was updated and revalidated before dispatching the final independent read-only verifier. |
 | 2026-08-11 | G15 independent totality/correctness/simplify review | ACCEPT | Independent 20/20 JSON fuzz returned stable codes and zero exceptions; four malformed `goal_progress.py record` cases returned code 2/no traceback/no write; planner, schema, URL, evidence, docs, static scan and current state passed. Targeted 62 and full 89 tests, architecture, passport, template and diff checks passed; no blocking finding remained. |
 | 2026-08-11 | Planner transition to G05 | PASS | After G15 acceptance the planner returned exactly one primary `launch` action for G05; the passport was updated and revalidated before the local release slice. |
+| 2026-08-11 | G05 postchange and strict local release | PASS | On checkpoint `f3c0ddb`, postchange and strict release gates passed with 89/89 tests, benchmark, bootstrap, architecture and installer checks. No network, push or deployment occurred. The acceptance artifact is committed as a template with final state, then re-proved and committed as evidence-only so its repository fingerprint remains fresh. |
