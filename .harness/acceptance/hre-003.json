@@ -6,37 +6,90 @@
       "id": "runtime-tests",
       "kind": "command",
       "description": "The complete local unit suite covers the integrated Harness behavior.",
-      "command": "python -m unittest discover -s tests -v"
+      "command": "python -m unittest discover -s tests -v",
+      "checkedAt": "2026-08-11T10:21:55.921790+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "848c37a7490e1a6f1072c8a8910ee5023daf6c221db1f1bb2151de467e6392ab",
+        "status": "ok"
+      },
+      "passes": true,
+      "evidence": "auto: exit 0; {\"affectedComponents\":[\"goal-runner\"],\"classification\":\"evaluate\",\"id\":\"codex-changelog-20260811\",\"reasons\":[\"score=3 (security*3 + compatibility*2 + userTime +",
+      "durationMs": 4204
     },
     {
       "id": "hre003-passport",
       "kind": "command",
       "description": "The final HRE-003 executable passport is valid.",
-      "command": "python goal_runner_validator.py check .harness/work/hre-003.passport.json"
+      "command": "python goal_runner_validator.py check .harness/work/hre-003.passport.json",
+      "checkedAt": "2026-08-11T10:22:00.117854+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "848c37a7490e1a6f1072c8a8910ee5023daf6c221db1f1bb2151de467e6392ab",
+        "status": "ok"
+      },
+      "passes": true,
+      "evidence": "auto: exit 0; PASS goal passport is valid",
+      "durationMs": 265
     },
     {
       "id": "autopilot-radar",
       "kind": "command",
       "description": "Planner, progress, validator and update-radar contracts pass their focused local regression set.",
-      "command": "python -m unittest tests.test_goal_orchestrator tests.test_goal_progress tests.test_goal_runner_validator tests.test_update_impact -v"
+      "command": "python -m unittest tests.test_goal_orchestrator tests.test_goal_progress tests.test_goal_runner_validator tests.test_update_impact -v",
+      "checkedAt": "2026-08-11T10:22:00.394042+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "848c37a7490e1a6f1072c8a8910ee5023daf6c221db1f1bb2151de467e6392ab",
+        "status": "ok"
+      },
+      "passes": true,
+      "evidence": "auto: exit 0; {\"affectedComponents\":[\"goal-runner\"],\"classification\":\"evaluate\",\"id\":\"codex-changelog-20260811\",\"reasons\":[\"score=3 (security*3 + compatibility*2 + userTime +",
+      "durationMs": 1391
     },
     {
       "id": "architecture",
       "kind": "command",
       "description": "Goal Runner architecture and the new local planner/radar wiring are internally consistent.",
-      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-GoalRunnerArchitecture.ps1"
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-GoalRunnerArchitecture.ps1",
+      "checkedAt": "2026-08-11T10:22:01.783051+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "848c37a7490e1a6f1072c8a8910ee5023daf6c221db1f1bb2151de467e6392ab",
+        "status": "ok"
+      },
+      "passes": true,
+      "evidence": "auto: exit 0; PASS Goal Runner architecture contract is internally consistent.",
+      "durationMs": 1015
     },
     {
       "id": "release-gate",
       "kind": "command",
       "description": "The strict local release gate passes without external actions.",
-      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-HarnessGate.ps1 -Stage release -Strict"
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-HarnessGate.ps1 -Stage release -Strict",
+      "checkedAt": "2026-08-11T10:22:02.792272+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "848c37a7490e1a6f1072c8a8910ee5023daf6c221db1f1bb2151de467e6392ab",
+        "status": "ok"
+      },
+      "passes": true,
+      "evidence": "auto: exit 0; PASS Harness gate 'release' passed.",
+      "durationMs": 16907
     },
     {
       "id": "independent-review",
       "kind": "manual",
       "description": "Independent correctness, security and simplify review accepted all HRE-003 trust boundaries after reproducing negative oracles.",
-      "evidence": ""
+      "evidence": "Independent G15 verifier accepted 20/20 total-validator fuzz, public CLI no-write behavior, planner/update trust boundaries, 62 targeted and 89 full tests, architecture and simplify review; no blocking finding remained.",
+      "passes": true,
+      "checkedAt": "2026-08-11T10:21:50.856069+00:00",
+      "durationMs": 0,
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "848c37a7490e1a6f1072c8a8910ee5023daf6c221db1f1bb2151de467e6392ab",
+        "status": "ok"
+      }
     }
   ]
 }
