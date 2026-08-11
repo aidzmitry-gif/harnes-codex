@@ -1,10 +1,13 @@
 import copy
+import json
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import goal_runner_validator
 from goal_runner_validator import validate_passport
 
 
@@ -26,6 +29,45 @@ class GoalPassportValidationTests(unittest.TestCase):
 
     def test_valid_plan_is_accepted(self):
         self.assertEqual([], validate_passport(valid_passport()))
+
+    def test_root_schema_version_requires_exact_integer(self):
+        self.assertEqual([], validate_passport(valid_passport()))
+        for version in (True, 1.0):
+            with self.subTest(version=version):
+                passport = valid_passport(); passport["schemaVersion"] = version
+                self.assert_code(passport, "SCHEMA_VERSION")
+
+    def test_json_enum_and_fingerprint_values_are_total(self):
+        fingerprint = {"algorithm": "sha256", "status": "ok", "value": "a" * 64}
+        cases = (
+            ("risk", lambda passport, value: passport["chain"].update({"riskClass": value}), "CHAIN_RISK"),
+            ("chain-status", lambda passport, value: passport["chain"].update({"status": value}), "CHAIN_STATUS"),
+            ("authorization", lambda passport, value: passport["chain"].update({"standingChainAuthorization": value}), "CHAIN_AUTH"),
+            ("scope", lambda passport, value: passport["chain"].update({"standingAuthorizationScope": value}), "CHAIN_AUTH"),
+            ("subgoal-status", lambda passport, value: passport["subgoals"][1].update({"status": value}), "SUBGOAL_STATUS"),
+            ("execution", lambda passport, value: passport["subgoals"][1].update({"execution": value}), "SUBGOAL_EXECUTION"),
+            ("model", lambda passport, value: passport["subgoals"][1].update({"model": value}), "SUBGOAL_MODEL"),
+            ("agent-status", lambda passport, value: passport["agents"][0].update({"status": value}), "AGENT_STATUS"),
+            ("repository-fingerprint", lambda passport, value: passport.update({"goalProgress": {"schemaVersion": 1, "attempts": [{"chainId": "HRE-001", "subgoalId": "G02", "strategyId": "minimal", "repositoryFingerprint": {**fingerprint, "status": value}, "unlockEvidenceFingerprint": None}]}}), "GOAL_PROGRESS"),
+            ("unlock-fingerprint", lambda passport, value: passport.update({"goalProgress": {"schemaVersion": 1, "attempts": [{"chainId": "HRE-001", "subgoalId": "G02", "strategyId": "minimal", "repositoryFingerprint": fingerprint, "unlockEvidenceFingerprint": {**fingerprint, "status": value}}]}}), "GOAL_PROGRESS"),
+        )
+        for name, mutate, code in cases:
+            for value in ([], {}):
+                with self.subTest(name=name, value=value):
+                    passport = valid_passport(); mutate(passport, value)
+                    first = validate_passport(passport)
+                    self.assertIn(code, [item[0] for item in first])
+                    self.assertEqual(first, validate_passport(passport))
+
+    @patch("goal_runner_validator.Path.read_text")
+    def test_check_cli_rejects_non_integer_root_schema_version(self, read_text):
+        read_text.return_value = json.dumps(valid_passport())
+        self.assertEqual(0, goal_runner_validator.main(["check", "passport.json"]))
+        for version in (True, 1.0):
+            with self.subTest(version=version):
+                passport = valid_passport(); passport["schemaVersion"] = version
+                read_text.return_value = json.dumps(passport)
+                self.assertEqual(2, goal_runner_validator.main(["check", "passport.json"]))
 
     def test_missing_authorization_is_rejected(self):
         passport = valid_passport(); passport["chain"]["standingAuthorizationScope"] = None
@@ -53,6 +95,30 @@ class GoalPassportValidationTests(unittest.TestCase):
     def test_duplicate_and_unknown_dependencies_are_rejected(self):
         passport = valid_passport(); passport["subgoals"][1]["dependsOn"] = ["missing", "missing"]
         self.assert_code(passport, "SUBGOAL_DEPENDS")
+
+    def test_malformed_nested_values_fail_closed(self):
+        passport = valid_passport(); passport["subgoals"][1]["dependsOn"] = [{}]
+        self.assert_code(passport, "SUBGOAL_DEPENDS")
+        passport = valid_passport(); passport["agents"][0]["subgoalId"] = []
+        self.assert_code(passport, "AGENT_SUBGOAL")
+
+    def test_check_cli_rejects_malformed_nested_values_without_traceback(self):
+        for mutate in (
+            lambda passport: passport["subgoals"][1].update({"dependsOn": [{}]}),
+            lambda passport: passport["agents"][0].update({"subgoalId": []}),
+        ):
+            with self.subTest(mutate=mutate):
+                passport = valid_passport(); mutate(passport)
+                with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as handle:
+                    json.dump(passport, handle)
+                    path = Path(handle.name)
+                try:
+                    result = subprocess.run([sys.executable, "goal_runner_validator.py", "check", str(path)], capture_output=True, text=True, check=False)
+                finally:
+                    path.unlink(missing_ok=True)
+                self.assertEqual(2, result.returncode)
+                self.assertIn("FAIL ", result.stdout)
+                self.assertNotIn("Traceback", result.stdout + result.stderr)
 
     def test_cycles_are_rejected(self):
         passport = valid_passport(); passport["subgoals"][0].update({"dependsOn": ["G02"], "wave": 3})

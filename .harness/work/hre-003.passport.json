@@ -8,17 +8,17 @@
     "externalSideEffectBoundary": "local-only; no network, push, deploy, migration, deletion, global install, or secrets",
     "parentOutcome": "Read-only Parent Goal action planner plus an evidence-separated significant-update radar.",
     "status": "running",
-    "planRevision": 1,
-    "approvedPassportRevision": 1,
-    "approvalProvenance": "task 019fca39-7a3e-7a90-a726-a47e3c72dc19; explicit user approval of HRE-003 revision 1 on 2026-08-11 Europe/Minsk; AGENTS.md unchanged and no push",
+    "planRevision": 5,
+    "approvedPassportRevision": 5,
+    "approvalProvenance": "task 019fca39-7a3e-7a90-a726-a47e3c72dc19; explicit user approval of HRE-003 revision 1 on 2026-08-11 Europe/Minsk; revisions 2 through 5 are bounded corrective waves after independent reviews, with parent outcome, owner, risk, external boundary, AGENTS.md exclusion, and no-push boundary unchanged",
     "canonicalWorkItemPath": ".harness/work/hre-003-autopilot-updates.md",
     "checkoutWorktreePolicy": "one writer per clean isolated worktree; primary integrates",
     "globalAgentCap": 2,
     "delegationDepthCap": 1,
     "standingChainAuthorization": "approved",
     "standingAuthorizationScope": "bounded continuation",
-    "currentVerifiedSubgoal": "P0",
-    "nextMinimalSliceAcceptance": "Match G01 and G02 orientation acknowledgements, revalidate immediately before writes, then authorize the isolated minimal slices.",
+    "currentVerifiedSubgoal": "G15",
+    "nextMinimalSliceAcceptance": "Planner must identify G05 as the only launch action; G05 must run fresh full, postchange, strict release and fingerprint-bound acceptance after the final state commit.",
     "baselineId": "manual-goal-updates-v1",
     "treatmentId": "autopilot-radar-v1",
     "metricsPath": ".harness/metrics/hre-003.jsonl",
@@ -42,7 +42,7 @@
       "id": "G01",
       "dependsOn": ["P0"],
       "wave": 2,
-      "status": "ready",
+      "status": "done",
       "execution": "subagent",
       "model": "terra",
       "worktree": ".worktrees/hre-003-g01",
@@ -55,7 +55,7 @@
       "id": "G02",
       "dependsOn": ["P0"],
       "wave": 2,
-      "status": "ready",
+      "status": "done",
       "execution": "subagent",
       "model": "terra",
       "worktree": ".worktrees/hre-003-g02",
@@ -69,7 +69,7 @@
       "id": "G03",
       "dependsOn": ["G01", "G02"],
       "wave": 3,
-      "status": "planned",
+      "status": "done",
       "execution": "primary",
       "model": "sol",
       "worktree": null,
@@ -83,7 +83,132 @@
       "id": "G04",
       "dependsOn": ["G01", "G02", "G03"],
       "wave": 4,
-      "status": "planned",
+      "status": "done",
+      "execution": "subagent",
+      "model": "sol",
+      "worktree": null,
+      "ownedPaths": []
+    },
+    {
+      "id": "G06",
+      "dependsOn": ["G04"],
+      "wave": 5,
+      "status": "done",
+      "execution": "subagent",
+      "model": "terra",
+      "worktree": ".worktrees/hre-003-g01",
+      "ownedPaths": [
+        "goal_orchestrator.py",
+        "tests/test_goal_orchestrator.py"
+      ]
+    },
+    {
+      "id": "G07",
+      "dependsOn": ["G04"],
+      "wave": 5,
+      "status": "done",
+      "execution": "subagent",
+      "model": "terra",
+      "worktree": ".worktrees/hre-003-g02",
+      "ownedPaths": [
+        "update_impact.py",
+        "tests/test_update_impact.py"
+      ]
+    },
+    {
+      "id": "G08",
+      "dependsOn": ["G06", "G07"],
+      "wave": 6,
+      "status": "done",
+      "execution": "subagent",
+      "model": "sol",
+      "worktree": null,
+      "ownedPaths": []
+    },
+    {
+      "id": "G09",
+      "dependsOn": ["G08"],
+      "wave": 7,
+      "status": "done",
+      "execution": "subagent",
+      "model": "terra",
+      "worktree": ".worktrees/hre-003-g01",
+      "ownedPaths": [
+        "goal_orchestrator.py",
+        "tests/test_goal_orchestrator.py"
+      ]
+    },
+    {
+      "id": "G10",
+      "dependsOn": ["G08"],
+      "wave": 7,
+      "status": "done",
+      "execution": "subagent",
+      "model": "terra",
+      "worktree": ".worktrees/hre-003-g02",
+      "ownedPaths": [
+        "goal_runner_validator.py",
+        "update_impact.py",
+        "tests/test_goal_runner_validator.py",
+        "tests/test_update_impact.py"
+      ]
+    },
+    {
+      "id": "G11",
+      "dependsOn": ["G09", "G10"],
+      "wave": 8,
+      "status": "done",
+      "execution": "subagent",
+      "model": "sol",
+      "worktree": null,
+      "ownedPaths": []
+    },
+    {
+      "id": "G12",
+      "dependsOn": ["G11"],
+      "wave": 10,
+      "status": "done",
+      "execution": "subagent",
+      "model": "terra",
+      "worktree": ".worktrees/hre-003-g02",
+      "ownedPaths": [
+        "goal_runner_validator.py",
+        "update_impact.py",
+        "tests/test_goal_runner_validator.py",
+        "tests/test_update_impact.py"
+      ]
+    },
+    {
+      "id": "G13",
+      "dependsOn": ["G12"],
+      "wave": 11,
+      "status": "done",
+      "execution": "subagent",
+      "model": "sol",
+      "worktree": null,
+      "ownedPaths": []
+    },
+    {
+      "id": "G14",
+      "dependsOn": ["G13"],
+      "wave": 13,
+      "status": "done",
+      "execution": "subagent",
+      "model": "terra",
+      "worktree": ".worktrees/hre-003-g02",
+      "ownedPaths": [
+        "goal_runner_validator.py",
+        "update_impact.py",
+        "tests/test_goal_progress.py",
+        "tests/test_goal_runner_validator.py",
+        "tests/test_update_impact.py"
+      ]
+    },
+    {
+      "id": "G15",
+      "dependsOn": ["G14"],
+      "wave": 14,
+      "status": "done",
       "execution": "subagent",
       "model": "sol",
       "worktree": null,
@@ -91,9 +216,9 @@
     },
     {
       "id": "G05",
-      "dependsOn": ["G04"],
-      "wave": 5,
-      "status": "planned",
+      "dependsOn": ["G15"],
+      "wave": 15,
+      "status": "running",
       "execution": "primary",
       "model": "sol",
       "worktree": null,
@@ -111,7 +236,7 @@
       "subgoalId": "G01",
       "role": "harness_goal_worker",
       "depth": 1,
-      "status": "orienting",
+      "status": "done",
       "writer": true,
       "worktree": ".worktrees/hre-003-g01",
       "ownedPaths": [
@@ -124,7 +249,7 @@
       "subgoalId": "G02",
       "role": "harness_goal_worker",
       "depth": 1,
-      "status": "orienting",
+      "status": "done",
       "writer": true,
       "worktree": ".worktrees/hre-003-g02",
       "ownedPaths": [
@@ -132,6 +257,141 @@
         "tests/test_update_impact.py",
         "templates/update-candidate.example.json"
       ]
+    },
+    {
+      "id": "hre003-g04-verifier",
+      "subgoalId": "G04",
+      "role": "harness_goal_verifier",
+      "depth": 1,
+      "status": "done",
+      "writer": false,
+      "worktree": null,
+      "ownedPaths": []
+    },
+    {
+      "id": "hre003-g06-correction",
+      "subgoalId": "G06",
+      "role": "harness_goal_worker",
+      "depth": 1,
+      "status": "done",
+      "writer": true,
+      "worktree": ".worktrees/hre-003-g01",
+      "ownedPaths": [
+        "goal_orchestrator.py",
+        "tests/test_goal_orchestrator.py"
+      ]
+    },
+    {
+      "id": "hre003-g07-correction",
+      "subgoalId": "G07",
+      "role": "harness_goal_worker",
+      "depth": 1,
+      "status": "done",
+      "writer": true,
+      "worktree": ".worktrees/hre-003-g02",
+      "ownedPaths": [
+        "update_impact.py",
+        "tests/test_update_impact.py"
+      ]
+    },
+    {
+      "id": "hre003-g08-verifier",
+      "subgoalId": "G08",
+      "role": "harness_goal_verifier",
+      "depth": 1,
+      "status": "done",
+      "writer": false,
+      "worktree": null,
+      "ownedPaths": []
+    },
+    {
+      "id": "hre003-g09-correction",
+      "subgoalId": "G09",
+      "role": "harness_goal_worker",
+      "depth": 1,
+      "status": "done",
+      "writer": true,
+      "worktree": ".worktrees/hre-003-g01",
+      "ownedPaths": [
+        "goal_orchestrator.py",
+        "tests/test_goal_orchestrator.py"
+      ]
+    },
+    {
+      "id": "hre003-g10-correction",
+      "subgoalId": "G10",
+      "role": "harness_goal_worker",
+      "depth": 1,
+      "status": "done",
+      "writer": true,
+      "worktree": ".worktrees/hre-003-g02",
+      "ownedPaths": [
+        "goal_runner_validator.py",
+        "update_impact.py",
+        "tests/test_goal_runner_validator.py",
+        "tests/test_update_impact.py"
+      ]
+    },
+    {
+      "id": "hre003-g11-verifier",
+      "subgoalId": "G11",
+      "role": "harness_goal_verifier",
+      "depth": 1,
+      "status": "done",
+      "writer": false,
+      "worktree": null,
+      "ownedPaths": []
+    },
+    {
+      "id": "hre003-g12-correction",
+      "subgoalId": "G12",
+      "role": "harness_goal_worker",
+      "depth": 1,
+      "status": "done",
+      "writer": true,
+      "worktree": ".worktrees/hre-003-g02",
+      "ownedPaths": [
+        "goal_runner_validator.py",
+        "update_impact.py",
+        "tests/test_goal_runner_validator.py",
+        "tests/test_update_impact.py"
+      ]
+    },
+    {
+      "id": "hre003-g13-verifier",
+      "subgoalId": "G13",
+      "role": "harness_goal_verifier",
+      "depth": 1,
+      "status": "done",
+      "writer": false,
+      "worktree": null,
+      "ownedPaths": []
+    },
+    {
+      "id": "hre003-g14-correction",
+      "subgoalId": "G14",
+      "role": "harness_goal_worker",
+      "depth": 1,
+      "status": "done",
+      "writer": true,
+      "worktree": ".worktrees/hre-003-g02",
+      "ownedPaths": [
+        "goal_runner_validator.py",
+        "update_impact.py",
+        "tests/test_goal_progress.py",
+        "tests/test_goal_runner_validator.py",
+        "tests/test_update_impact.py"
+      ]
+    },
+    {
+      "id": "hre003-g15-verifier",
+      "subgoalId": "G15",
+      "role": "harness_goal_verifier",
+      "depth": 1,
+      "status": "done",
+      "writer": false,
+      "worktree": null,
+      "ownedPaths": []
     }
   ]
 }

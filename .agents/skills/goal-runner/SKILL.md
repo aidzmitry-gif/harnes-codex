@@ -94,6 +94,22 @@ For each wave:
 - A local Graphify knowledge graph is a read-only discovery aid. It can reduce repository reading, but it neither changes passport status nor unlocks a subgoal.
 - Graphify output is not acceptance evidence by itself. A transition requires the passport's current, fresh acceptance evidence; Graphify may be cited only as navigation to the files or checks that produce that evidence.
 
+### Parent Goal Play/resume control
+
+- Keep one native Goal in the primary task. Use subagent tasks for bounded work and separate regular tasks only for distinct long-lived outcomes or safe context boundaries; do not create a native Goal for every short subgoal.
+- On primary Goal start/resume and after every accepted result or plan revision, run `python goal_orchestrator.py plan <passport> --parent-state running`. Use `paused` or `blocked` when that is the actual parent state. The planner validates the current passport and returns actions; it never presses UI controls, starts tasks, changes status, or writes files.
+- Interpret `launch` as permission to dispatch only the listed ready slice after one more current-passport validation. Interpret `wait` as a prohibition on duplicate work, `verify` as a requirement to reproduce evidence before marking the subgoal done, and `hold` as no new dispatch. An active child under a paused/blocked parent should reach a safe checkpoint and stop; do not claim the UI pause cascaded automatically.
+- Treat `complete` as a scheduling signal, not parent acceptance. The correctness review, simplify review, integration checks, fresh evidence, and parent acceptance in section 9 remain mandatory.
+- Return child blockers and user questions to the primary task. Batch decisions there so the user normally interacts with one Goal task rather than supervising each child.
+
+### Update impact radar
+
+- For OpenAI/Codex changes, fetch the current official source first and write one bounded local candidate that keeps `facts`, `inferences`, and `assumptions` separate. Verify installed/local capability state independently; an API-only feature is not evidence that the current Codex runtime can use it.
+- Run `python update_impact.py classify <candidate.json>`. The classifier is offline, accepts only the official OpenAI documentation host allowlist, never executes source text, and returns `significant`, `evaluate`, or `ignore` with a transparent score.
+- `significant` means `run-local-evaluation`, not automatic adoption. Implement only after a representative local comparison shows a meaningful Harness gain and the normal Goal approval boundary permits the change. `evaluate` collects more evidence; `ignore` creates no work.
+- Keep Terra as the default for clear supporting work and Sol for ambiguity, architecture, risk, failed verification, and final synthesis. Use Luna or a higher reasoning mode only when the runtime actually exposes it and representative acceptance/eval evidence justifies the quality, latency, and usage tradeoff.
+- The radar does not schedule itself, update Codex/Graphify, install plugins, or make network calls. Those actions require separate authority.
+
 Do not reconstruct the parent plan on every cycle. Re-read durable state and only the evidence needed for the next wave.
 
 ### Git checkpoints and change journal

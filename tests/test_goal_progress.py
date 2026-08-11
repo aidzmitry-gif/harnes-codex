@@ -1,4 +1,8 @@
+import hashlib
 import json
+import subprocess
+import sys
+import tempfile
 import unittest
 from copy import deepcopy
 from pathlib import Path
@@ -104,6 +108,21 @@ class GoalProgressTests(unittest.TestCase):
         read_text.return_value = json.dumps(passport)
         self.assertEqual(2, self.invoke("record"))
         save_atomic.assert_not_called()
+
+    def test_record_cli_rejects_malformed_passport_without_write_or_traceback(self):
+        passport = valid_passport(); passport["chain"]["riskClass"] = []
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as handle:
+            json.dump(passport, handle)
+            path = Path(handle.name)
+        try:
+            before = hashlib.sha256(path.read_bytes()).hexdigest()
+            result = subprocess.run([sys.executable, "goal_progress.py", "record", str(path), "G02", "minimal"], capture_output=True, text=True, check=False)
+            after = hashlib.sha256(path.read_bytes()).hexdigest()
+        finally:
+            path.unlink(missing_ok=True)
+        self.assertEqual(2, result.returncode)
+        self.assertNotIn("Traceback", result.stdout + result.stderr)
+        self.assertEqual(before, after)
 
     @patch("goal_progress.save_atomic")
     @patch("goal_progress.Path.read_text")

@@ -20,6 +20,11 @@ FINGERPRINT = re.compile(r"^[0-9a-f]{64}$")
 MAX_GOAL_PROGRESS_ATTEMPTS = 256
 
 
+def enum_member(value: object, choices: set[str]) -> bool:
+    """Safely test a JSON value against a string enum."""
+    return isinstance(value, str) and value in choices
+
+
 def validate_goal_progress(value: object) -> list[tuple[str, str]]:
     """Validate the bounded durable no-progress state in an executable passport."""
     if value is None:
@@ -43,7 +48,7 @@ def validate_goal_progress(value: object) -> list[tuple[str, str]]:
             fingerprint = item[field]
             if fingerprint is None and field == "unlockEvidenceFingerprint":
                 continue
-            if not isinstance(fingerprint, dict) or set(fingerprint) != {"algorithm", "status", "value"} or fingerprint.get("algorithm") != "sha256" or fingerprint.get("status") not in statuses or not isinstance(fingerprint.get("value"), str) or not FINGERPRINT.fullmatch(fingerprint["value"]):
+            if not isinstance(fingerprint, dict) or set(fingerprint) != {"algorithm", "status", "value"} or fingerprint.get("algorithm") != "sha256" or not enum_member(fingerprint.get("status"), statuses) or not isinstance(fingerprint.get("value"), str) or not FINGERPRINT.fullmatch(fingerprint["value"]):
                 return [("GOAL_PROGRESS", f"goalProgress.attempts[{index}].{field} must be a bounded sha256 fingerprint")]
         signature = json.dumps(item, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
         if signature in seen:
@@ -100,7 +105,7 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
     root = mapping(passport, "passport")
     if root is None:
         return sorted(errors)
-    if root.get("schemaVersion") != 1:
+    if not isinstance(root.get("schemaVersion"), int) or isinstance(root.get("schemaVersion"), bool) or root.get("schemaVersion") != 1:
         fail("SCHEMA_VERSION", "schemaVersion must be 1")
     errors.extend(validate_goal_progress(root.get("goalProgress")))
     chain = mapping(root.get("chain"), "chain")
@@ -117,9 +122,11 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
 
     for field in ("chainId", "projectRoot", "dataOwner", "externalSideEffectBoundary", "parentOutcome", "approvalProvenance", "checkoutWorktreePolicy", "nextMinimalSliceAcceptance"):
         text(chain.get(field), f"chain.{field}")
-    if chain.get("riskClass") not in {"low", "medium", "high"}:
+    risk_class = chain.get("riskClass")
+    if not enum_member(risk_class, {"low", "medium", "high"}):
         fail("CHAIN_RISK", "chain.riskClass must be low, medium, or high")
-    if chain.get("status") not in CHAIN_STATUSES:
+    chain_status = chain.get("status")
+    if not enum_member(chain_status, CHAIN_STATUSES):
         fail("CHAIN_STATUS", "chain.status is invalid")
     for field, minimum, maximum in (("planRevision", 1, None), ("globalAgentCap", 1, 12), ("delegationDepthCap", 0, 2)):
         value = chain.get(field)
@@ -129,18 +136,20 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
     approved_revision = chain.get("approvedPassportRevision")
     if isinstance(approved_revision, bool) or not isinstance(approved_revision, int) or approved_revision < 1:
         fail("CHAIN_REVISION", "chain.approvedPassportRevision must be an integer >= 1")
-    if chain.get("standingChainAuthorization") not in {"absent", "approved"}:
+    authorization = chain.get("standingChainAuthorization")
+    if not enum_member(authorization, {"absent", "approved"}):
         fail("CHAIN_AUTH", "chain.standingChainAuthorization must be absent or approved")
     scope = chain.get("standingAuthorizationScope")
-    if chain.get("standingChainAuthorization") == "approved":
-        if scope not in AUTH_SCOPES:
+    if authorization == "approved":
+        if not enum_member(scope, AUTH_SCOPES):
             fail("CHAIN_AUTH", "approved standing authorization requires a valid scope")
     elif scope is not None:
         fail("CHAIN_AUTH", "absent standing authorization requires a null scope")
     plan_revision = chain.get("planRevision")
-    if chain.get("status") in EXECUTABLE_CHAIN_STATUSES and chain.get("approvedPassportRevision") != plan_revision:
+    executable = enum_member(chain_status, EXECUTABLE_CHAIN_STATUSES)
+    if executable and chain.get("approvedPassportRevision") != plan_revision:
         fail("CHAIN_REVISION", "approvedPassportRevision must equal planRevision for executable status")
-    if chain.get("status") in EXECUTABLE_CHAIN_STATUSES:
+    if executable:
         for field in ("canonicalWorkItemPath", "baselineId", "treatmentId", "metricsPath"):
             text(chain.get(field), f"chain.{field}")
         canonical = chain.get("canonicalWorkItemPath")
@@ -186,11 +195,11 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
         wave = item.get("wave")
         if isinstance(wave, bool) or not isinstance(wave, int) or wave < 1:
             fail("SUBGOAL_WAVE", f"subgoals[{index}].wave must be a positive integer")
-        if item.get("status") not in SUBGOAL_STATUSES:
+        if not enum_member(item.get("status"), SUBGOAL_STATUSES):
             fail("SUBGOAL_STATUS", f"subgoals[{index}].status is invalid")
-        if item.get("execution") not in {"primary", "subagent", "task"}:
+        if not enum_member(item.get("execution"), {"primary", "subagent", "task"}):
             fail("SUBGOAL_EXECUTION", f"subgoals[{index}].execution is invalid")
-        if item.get("model") not in {"terra", "sol"}:
+        if not enum_member(item.get("model"), {"terra", "sol"}):
             fail("SUBGOAL_MODEL", f"subgoals[{index}].model is invalid")
         if "worktree" not in item or item.get("worktree") is not None and not isinstance(item.get("worktree"), str):
             fail("SUBGOAL_WORKTREE", f"subgoals[{index}].worktree must be string or null")
@@ -213,7 +222,8 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
                     fail("UNLOCK_EVIDENCE", f"subgoals[{index}].unlockEvidence.criterionId is invalid")
 
     def dependencies(item: dict) -> list[str]:
-        return item.get("dependsOn") if isinstance(item.get("dependsOn"), list) else []
+        value = item.get("dependsOn")
+        return [dependency for dependency in value if isinstance(dependency, str)] if isinstance(value, list) else []
 
     for identifier, item in by_id.items():
         for dependency in dependencies(item):
@@ -222,13 +232,13 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
                 continue
             if isinstance(item.get("wave"), int) and isinstance(by_id[dependency].get("wave"), int) and item["wave"] <= by_id[dependency]["wave"]:
                 fail("SUBGOAL_WAVE", f"{identifier} must have a later wave than {dependency}")
-        if item.get("status") in {"ready", "running"}:
-            unfinished = [dep for dep in dependencies(item) if dep in by_id and by_id[dep].get("status") not in {"done", "skipped"}]
+        if enum_member(item.get("status"), {"ready", "running"}):
+            unfinished = [dep for dep in dependencies(item) if dep in by_id and not enum_member(by_id[dep].get("status"), {"done", "skipped"})]
             if unfinished:
                 fail("SUBGOAL_READY", f"{identifier} has unfinished dependencies: {', '.join(sorted(unfinished))}")
             unlock = item.get("unlockEvidence")
             if isinstance(unlock, dict) and isinstance(unlock.get("workItem"), str) and isinstance(unlock.get("criterionId"), str):
-                skipped = [dep for dep in dependencies(item) if dep in by_id and by_id[dep].get("status") == "skipped" and (not isinstance(by_id[dep].get("skipReason"), str) or not by_id[dep]["skipReason"].strip())]
+                skipped = [dep for dep in dependencies(item) if dep in by_id and enum_member(by_id[dep].get("status"), {"skipped"}) and (not isinstance(by_id[dep].get("skipReason"), str) or not by_id[dep]["skipReason"].strip())]
                 if skipped:
                     fail("SUBGOAL_SKIP_REASON", f"{identifier} has skipped dependencies without skipReason: {', '.join(sorted(skipped))}")
                 try:
@@ -256,15 +266,15 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
 
     for identifier in sorted(by_id):
         visit(identifier)
-    if chain.get("status") == "complete":
-        unfinished = sorted(identifier for identifier, item in by_id.items() if item.get("status") not in {"done", "skipped"})
+    if chain_status == "complete":
+        unfinished = sorted(identifier for identifier, item in by_id.items() if not enum_member(item.get("status"), {"done", "skipped"}))
         if unfinished:
             fail("CHAIN_COMPLETE", "complete chain has unfinished subgoals: " + ", ".join(unfinished))
     verified = chain.get("currentVerifiedSubgoal")
     if (
         "currentVerifiedSubgoal" not in chain
-        or chain.get("standingChainAuthorization") == "approved" and verified is None
-        or verified is not None and (not isinstance(verified, str) or verified not in by_id or by_id[verified].get("status") not in {"done", "skipped"})
+        or authorization == "approved" and verified is None
+        or verified is not None and (not isinstance(verified, str) or verified not in by_id or not enum_member(by_id[verified].get("status"), {"done", "skipped"}))
     ):
         fail("CHAIN_VERIFIED", "currentVerifiedSubgoal must name a done or skipped subgoal")
 
@@ -280,13 +290,15 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
             fail("AGENT_ID", f"agents[{index}].id must be unique and nonempty")
         else:
             agent_ids.add(identifier)
-        if item.get("subgoalId") not in by_id:
+        agent_subgoal_id = item.get("subgoalId")
+        if not isinstance(agent_subgoal_id, str) or agent_subgoal_id not in by_id:
             fail("AGENT_SUBGOAL", f"agents[{index}].subgoalId must name a known subgoal")
         text(item.get("role"), f"agents[{index}].role")
         depth = item.get("depth")
         if isinstance(depth, bool) or not isinstance(depth, int) or depth < 0 or isinstance(chain.get("delegationDepthCap"), int) and depth > chain["delegationDepthCap"]:
             fail("AGENT_DEPTH", f"agents[{index}].depth exceeds delegation depth cap")
-        if item.get("status") not in AGENT_STATUSES:
+        agent_status = item.get("status")
+        if not enum_member(agent_status, AGENT_STATUSES):
             fail("AGENT_STATUS", f"agents[{index}].status is invalid")
         if not isinstance(item.get("writer"), bool):
             fail("AGENT_WRITER", f"agents[{index}].writer must be boolean")
@@ -297,16 +309,16 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
         if isinstance(agent_paths, list):
             for path_index, path in enumerate(agent_paths):
                 portable_relative_path(path, f"agents[{index}].ownedPaths[{path_index}]")
-        if item.get("status") in {"orienting", "active"}:
+        if enum_member(agent_status, {"orienting", "active"}):
             active_count += 1
-        if item.get("writer") and item.get("status") in {"orienting", "active"}:
+        if item.get("writer") and enum_member(agent_status, {"orienting", "active"}):
             worktree, paths = item.get("worktree"), item.get("ownedPaths")
             if not isinstance(worktree, str) or not worktree.strip() or not isinstance(paths, list) or not paths or any(not isinstance(path, str) or not path for path in paths):
                 fail("WRITER_OWNERSHIP", f"writer {identifier or index} requires a worktree and owned paths")
             else:
                 normalized_worktree = portable_relative_path(worktree, f"agents[{index}].worktree")
                 normalized_paths = [portable_relative_path(path, f"agents[{index}].ownedPaths[{path_index}]") for path_index, path in enumerate(paths)]
-                subgoal = by_id.get(item.get("subgoalId"), {})
+                subgoal = by_id.get(agent_subgoal_id, {}) if isinstance(agent_subgoal_id, str) else {}
                 expected_worktree = subgoal.get("worktree")
                 expected_paths = subgoal.get("ownedPaths")
                 normalized_expected_worktree = portable_relative_path(expected_worktree, f"subgoals[{item.get('subgoalId')}].worktree")
@@ -327,7 +339,7 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
                     active_writers.append(("/".join(normalized_worktree), ["/".join(path) for path in normalized_paths if path is not None], identifier or str(index)))
     if isinstance(chain.get("globalAgentCap"), int) and active_count > chain["globalAgentCap"]:
         fail("AGENT_CAP", "active and orienting agents exceed globalAgentCap")
-    if chain.get("status") == "complete" and active_count:
+    if chain_status == "complete" and active_count:
         fail("CHAIN_COMPLETE", "complete chain cannot have active or orienting agents")
     for position, (worktree, paths, identifier) in enumerate(active_writers):
         for other_worktree, other_paths, other_identifier in active_writers[position + 1:]:
@@ -347,7 +359,11 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, json.JSONDecodeError) as exc:
         print(f"FAIL INPUT: {exc}")
         return 2
-    errors = validate_passport(passport)
+    try:
+        errors = validate_passport(passport)
+    except (AttributeError, KeyError, TypeError):
+        print("FAIL INPUT: malformed passport structure")
+        return 2
     if errors:
         for code, message in errors:
             print(f"FAIL {code}: {message}")
