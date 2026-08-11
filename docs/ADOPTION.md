@@ -72,3 +72,15 @@ python .\harness_benchmark.py --fixture .\tests\fixtures\hre-001-benchmark.json
 Для удаления выполните `scripts/Uninstall-GoalRunner.ps1 -WhatIf`, затем ту же команду без `-WhatIf`. Удаляются только managed `[agents]`, Goal Runner junction и четыре неизменённых role-файла; общий Context Handoff сохраняется.
 
 Не оценивайте готовность по числу запущенных агентов. Пул до 12 нужен для независимой работы; оркестратор обязан уменьшать волну, если зависимости, доступный runtime или изоляция не позволяют безопасную параллельность.
+
+## Автономный радар обновлений OpenAI
+
+Сначала проверьте локальный контракт вручную:
+
+```powershell
+python .\update_radar.py scan .\templates\update-batch.example.json --state .harness\runtime\update-radar-state.json
+```
+
+Затем создайте в ChatGPT desktop Scheduled Task для этого локального проекта и используйте `templates/update-radar-task.md` как каноническую инструкцию. Рекомендуемый режим — ежедневный локальный запуск в 09:00 по часовому поясу пользователя, report-only, с уведомлением о каждом результате. Компьютер и приложение должны быть запущены, когда задаче нужны локальные файлы; это ограничение подтверждено [официальной документацией OpenAI Scheduled Tasks](https://learn.chatgpt.com/docs/automations).
+
+Runtime-файлы `.harness/runtime/update-radar-batch.json` и `.harness/runtime/update-radar-state.json` игнорируются Git. Они являются локальным журналом дедупликации, а не acceptance evidence. Не переносите их между проектами: соседний репозиторий должен подключать и проверять Harness отдельно.

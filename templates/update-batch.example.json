@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "candidates": [
+    {
+      "schemaVersion": 1,
+      "id": "codex-cli-0.147.0-agent-plugins",
+      "product": "openai",
+      "publishedDate": "2026-08-07",
+      "sourceUrl": "https://learn.chatgpt.com/docs/changelog",
+      "facts": [
+        "The official changelog lists portable Agent Plugins as a Codex CLI 0.147.0 feature."
+      ],
+      "inferences": [
+        "Portable plugin distribution may reduce Harness installation and update effort."
+      ],
+      "assumptions": [
+        "The current local Harness installation has not migrated to Agent Plugins."
+      ],
+      "impact": {
+        "security": 0,
+        "compatibility": 1,
+        "userTime": 2,
+        "reliability": 1,
+        "implementationCost": 2
+      },
+      "affectedComponents": [
+        "goal-runner",
+        "installer",
+        "plugins"
+      ]
+    }
+  ]
+}

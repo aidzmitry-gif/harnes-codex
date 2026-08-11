@@ -106,9 +106,10 @@ For each wave:
 
 - For OpenAI/Codex changes, fetch the current official source first and write one bounded local candidate that keeps `facts`, `inferences`, and `assumptions` separate. Verify installed/local capability state independently; an API-only feature is not evidence that the current Codex runtime can use it.
 - Run `python update_impact.py classify <candidate.json>`. The classifier is offline, accepts only the official OpenAI documentation host allowlist, never executes source text, and returns `significant`, `evaluate`, or `ignore` with a transparent score.
+- For recurring review, pass a strict bounded batch to `python update_radar.py scan <batch.json> --state .harness/runtime/update-radar-state.json`. The watcher reuses the same classifier, stores only candidate IDs and SHA-256 digests, suppresses exact repeats, and fails closed on conflicting history before writing state.
 - `significant` means `run-local-evaluation`, not automatic adoption. Implement only after a representative local comparison shows a meaningful Harness gain and the normal Goal approval boundary permits the change. `evaluate` collects more evidence; `ignore` creates no work.
 - Keep Terra as the default for clear supporting work and Sol for ambiguity, architecture, risk, failed verification, and final synthesis. Use Luna or a higher reasoning mode only when the runtime actually exposes it and representative acceptance/eval evidence justifies the quality, latency, and usage tradeoff.
-- The radar does not schedule itself, update Codex/Graphify, install plugins, or make network calls. Those actions require separate authority.
+- The local classifier and watcher do not schedule themselves or make network calls. After separate user authority, a report-only Scheduled Task may read the fixed official source set and call the watcher; it must not update Codex/Graphify, install plugins, edit source, commit, push, deploy, or adopt a recommendation automatically.
 
 Do not reconstruct the parent plan on every cycle. Re-read durable state and only the evidence needed for the next wave.
 

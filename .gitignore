@@ -9,6 +9,7 @@ graphify-out/
 .harness/test-tmp/
 .harness/metrics/
 .harness/benchmarks/runs/
+.harness/runtime/
 
 # Transactional and temporary files.
 *.tmp

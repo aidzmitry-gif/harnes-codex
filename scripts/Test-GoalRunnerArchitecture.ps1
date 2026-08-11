@@ -19,6 +19,10 @@ $goalProgress = Join-Path $root 'goal_progress.py'
 $goalOrchestrator = Join-Path $root 'goal_orchestrator.py'
 $updateImpact = Join-Path $root 'update_impact.py'
 $updateCandidate = Join-Path $root 'templates\update-candidate.example.json'
+$updateRadar = Join-Path $root 'update_radar.py'
+$updateBatch = Join-Path $root 'templates\update-batch.example.json'
+$updateRadarTask = Join-Path $root 'templates\update-radar-task.md'
+$updateRadarState = Join-Path $root '.harness\runtime\architecture-update-radar-state.json'
 
 $pythonCheck = @'
 import json, sys, tomllib
@@ -60,7 +64,7 @@ print(json.dumps({'cap': agents['max_concurrent_threads_per_session'], 'roles': 
 & python -c $pythonCheck $root
 if ($LASTEXITCODE -ne 0) { throw 'TOML and acceptance architecture validation failed.' }
 
-foreach ($path in @($config, $skill, $goalState, $ladder, $handoff, $reminder, $installer, $uninstaller, $acceptanceTemplate, $passport, $benchmarkFixture, $configFixture, $goalProgress, $goalOrchestrator, $updateImpact, $updateCandidate)) {
+foreach ($path in @($config, $skill, $goalState, $ladder, $handoff, $reminder, $installer, $uninstaller, $acceptanceTemplate, $passport, $benchmarkFixture, $configFixture, $goalProgress, $goalOrchestrator, $updateImpact, $updateCandidate, $updateRadar, $updateBatch, $updateRadarTask)) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing required file: $path" }
 }
 
@@ -72,6 +76,11 @@ if ($LASTEXITCODE -ne 0) { throw 'Parent Goal action planner rejected the valid 
 
 & python $updateImpact classify $updateCandidate | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Update impact radar rejected the valid example candidate.' }
+
+Remove-Item -LiteralPath $updateRadarState -Force -ErrorAction SilentlyContinue
+& python $updateRadar scan $updateBatch --state $updateRadarState | Out-Null
+if ($LASTEXITCODE -ne 0) { throw 'Autonomous update watcher rejected the valid example batch.' }
+Remove-Item -LiteralPath $updateRadarState -Force -ErrorAction SilentlyContinue
 
 $skillText = Get-Content -LiteralPath $skill -Raw
 $goalStateText = Get-Content -LiteralPath $goalState -Raw
@@ -108,6 +117,7 @@ $requiredSkillPatterns = @(
     'goal_orchestrator.py plan',
     'Update impact radar',
     'update_impact.py classify',
+    'update_radar.py scan',
     'run-local-evaluation',
     'API-only feature',
     'Use Luna'
@@ -118,8 +128,13 @@ foreach ($pattern in $requiredSkillPatterns) {
 if ($skillText.Contains('TODO')) { throw 'Goal Runner skill still contains TODO.' }
 
 $readmeText = Get-Content -LiteralPath (Join-Path $root 'README.md') -Raw
-foreach ($pattern in @('goal_progress.py check', 'NO_PROGRESS', 'control DAG', 'Graphify', 'acceptance evidence', 'goal_orchestrator.py plan', 'update_impact.py classify', 'run-local-evaluation', 'API-only')) {
+foreach ($pattern in @('goal_progress.py check', 'NO_PROGRESS', 'control DAG', 'Graphify', 'acceptance evidence', 'goal_orchestrator.py plan', 'update_impact.py classify', 'update_radar.py scan', 'run-local-evaluation', 'API-only', 'no-meaningful-updates')) {
     if (-not $readmeText.Contains($pattern)) { throw "README control-evidence contract missing: $pattern" }
+}
+
+$updateRadarTaskText = Get-Content -LiteralPath $updateRadarTask -Raw
+foreach ($pattern in @('https://learn.chatgpt.com/docs/changelog', 'https://developers.openai.com/api/docs/changelog', 'https://developers.openai.com/api/docs/deprecations', 'https://developers.openai.com/api/docs/guides/latest-model', 'report-only', 'commit, push')) {
+    if (-not $updateRadarTaskText.Contains($pattern)) { throw "Update radar task contract missing: $pattern" }
 }
 
 $requiredStatePatterns = @(
