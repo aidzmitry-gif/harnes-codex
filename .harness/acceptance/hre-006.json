@@ -10,13 +10,13 @@
       "timeoutSeconds": 300,
       "passes": true,
       "evidence": "auto: exit 0; PASS Harness gate 'release' passed.",
-      "checkedAt": "2026-09-05T09:29:35.743306+00:00",
+      "checkedAt": "2026-09-05T09:46:22.903801+00:00",
       "fingerprint": {
         "algorithm": "sha256",
-        "value": "5be9b2c03489ea652fabe01c3f0a5d79af9b38832819c94bb092614e80436273",
+        "value": "892c684acc15d4048073f97d0b8058877455556a23f2071bf2e72088f33bdd2d",
         "status": "ok"
       },
-      "durationMs": 36687
+      "durationMs": 38312
     },
     {
       "id": "bundle",
@@ -25,13 +25,13 @@
       "command": "python -c \"from pathlib import Path; import harness_distribution as h; m=h.load_release(Path.cwd())[0]; assert len(m['files'])==18; print('PASS source release '+m['releaseId'])\"",
       "passes": true,
       "evidence": "auto: exit 0; PASS source release 2026.09.05-hre006.1",
-      "checkedAt": "2026-09-05T09:30:12.431571+00:00",
+      "checkedAt": "2026-09-05T09:47:01.223401+00:00",
       "fingerprint": {
         "algorithm": "sha256",
-        "value": "5be9b2c03489ea652fabe01c3f0a5d79af9b38832819c94bb092614e80436273",
+        "value": "892c684acc15d4048073f97d0b8058877455556a23f2071bf2e72088f33bdd2d",
         "status": "ok"
       },
-      "durationMs": 438
+      "durationMs": 516
     },
     {
       "id": "baseline",
@@ -40,25 +40,25 @@
       "command": "python -c \"import hashlib; from pathlib import Path; assert hashlib.sha256(Path('AGENTS.md').read_bytes()).hexdigest()=='b0184c9d679de0622e8f42f9673132007c3bb4e3bf18af85a44845e9e4d116bf'; print('PASS AGENTS baseline unchanged')\"",
       "passes": true,
       "evidence": "auto: exit 0; PASS AGENTS baseline unchanged",
-      "checkedAt": "2026-09-05T09:30:12.872998+00:00",
+      "checkedAt": "2026-09-05T09:47:01.731286+00:00",
       "fingerprint": {
         "algorithm": "sha256",
-        "value": "5be9b2c03489ea652fabe01c3f0a5d79af9b38832819c94bb092614e80436273",
+        "value": "892c684acc15d4048073f97d0b8058877455556a23f2071bf2e72088f33bdd2d",
         "status": "ok"
       },
-      "durationMs": 328
+      "durationMs": 359
     },
     {
       "id": "local-core-wave",
       "kind": "manual",
       "description": "Local managed-core rollout is verified without pretending project acceptance or other-PC installation.",
       "passes": true,
-      "evidence": "2026-09-05: registered31 roots ->19 current,10 deferred,1 SEO conflict,1 source. Pilot installed18 then current changed=false. Primary verified19 source-bound receipts and18 hashes each; copied validator-example smoke19PASS. Compared155 protected path hashes/absence before-after:0 changes; raw private evidence retained only in ignored runtime. Every installed project has profileConfigured=false/projectAcceptance=not-run. Other PCs not connected, no remote installation or automatic scheduler claimed.",
-      "checkedAt": "2026-09-05T09:29:34.519541+00:00",
+      "evidence": "2026-09-05: final registry31 ->20 current,9 deferred,1 SEO conflict,1 source. Initial19 roots: source-bound receipts18hashes each, validator smoke19PASS and independent hash audit19PASS. Graphify became20th after clean checkout and successful mandatory pull --ff-only: receipt/source18hashes/read-only repeat plan/validator smokePASS. Initial155 protected path comparisons0changes retained as raw ignored before-after evidence. All20profileConfigured=false/projectAcceptance=not-run. Other PCs not connected; no future auto-updater/scheduler or project workflow adoption claimed.",
+      "checkedAt": "2026-09-05T09:46:21.781358+00:00",
       "durationMs": 0,
       "fingerprint": {
         "algorithm": "sha256",
-        "value": "5be9b2c03489ea652fabe01c3f0a5d79af9b38832819c94bb092614e80436273",
+        "value": "892c684acc15d4048073f97d0b8058877455556a23f2071bf2e72088f33bdd2d",
         "status": "ok"
       }
     },
@@ -67,12 +67,12 @@
       "kind": "manual",
       "description": "Independent correctness and subsequent simplify review, including fixes and live receipt audit.",
       "passes": true,
-      "evidence": "Independent fleet_verify correctness found strict registry and status defects; fixes verified using actual PowerShell wrapper. Portability review found autocrlf drift, fixed with exact18 LF attrs and regenerated manifest. Primary19targetedPASS11.626s; independent narrowed portability+wrapper2PASS9.561s. Final independent receipt audit19of19 exact current source,18hashes,zero locks; simplify pass accepted fixed allowlist,stdlib,native lock,bounded backups,no dependency or scheduler. Independent historical155-path comparison not claimed; its raw snapshots are primary evidence.",
-      "checkedAt": "2026-09-05T09:29:34.960654+00:00",
+      "evidence": "Independent fleet_verify correctness -> simplify accepted strict registry, real PowerShell wrapper, exact18 Git LF portability, bounded rollback/cleanup; narrowed2testsPASS9.561s and independent initial19receipt/hashes auditPASS with no locks. Primary19distributiontestsPASS11.626s. Post-wave deferred review read full local policies: TS exception, own branch/fresh-task integration, graph-update obligation, empty.git evidence failure; no blanket-success claim. Graphify additional controlled core install verified by primary against unchanged published payload after mandatory pull. Private project paths and generated graph/memory/state excluded from publication.",
+      "checkedAt": "2026-09-05T09:46:22.192560+00:00",
       "durationMs": 0,
       "fingerprint": {
         "algorithm": "sha256",
-        "value": "5be9b2c03489ea652fabe01c3f0a5d79af9b38832819c94bb092614e80436273",
+        "value": "892c684acc15d4048073f97d0b8058877455556a23f2071bf2e72088f33bdd2d",
         "status": "ok"
       }
     }

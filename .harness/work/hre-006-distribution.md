@@ -3,7 +3,7 @@
 ## Контракт и разрешение
 
 - Запрос пользователя 2026-09-05: «все сделай обновление смотри Графифай», в ответ на предложенные пять шагов: проверенный выпуск в существующем GitHub, подключение ПК, регистрация проектов, безопасное обновление, фактическая проверка версии.
-- Статус: local-core-rollout-verified, publication pending. Это новая область после HRE-005; его запрет публикации/других проектов относился к предыдущей реализации. AGENTS.md baseline остаётся неприкосновенным.
+- Статус: local-core-published (20 current / 31 inventory); оставшиеся проекты и другие ПК требуют решений по конкретным контрактам/подключения. Это новая область после HRE-005; его запрет публикации/других проектов относился к предыдущей реализации. AGENTS.md baseline остаётся неприкосновенным.
 - Исход: воспроизводимая доставка проверенной версии Harness в зарегистрированные проекты доступного ПК и пакет подключения других ПК; недоступные машины/конфликты отражать явно, не считать установленными.
 - На этом этапе доступны 31 local project в Codex, один host local. Graphify index от 2026-08-31 содержит 26 проектов, sources.local — 15 путей; это навигация, не разрешение и не актуальная инвентаризация.
 - Разрешены разработка и тестирование ограниченного updater, точечная установка управляемых файлов в подтверждённые локальные roots, штатная глобальная установка, публикация проверенных собственных изменений в aidzmitry-gif/harnes-codex без force.
@@ -59,3 +59,19 @@
 - Other PCs: нет подключённого host/access, значит недоступны для установки. Следующий измеримый шаг — подключить ПК, получить тот же проверенный tag в чистую локальную папку и выполнить preview по его собственному registry. Не переносить auth/config/state/секреты с этого ПК.
 - Автоматическое получение/применение будущих релизов не создано: нужен отдельно проверенный trusted source, scheduler и idle gate. Этот CLI не обещает фонового автообновления.
 - G05: финальный strict release и source acceptance перед точным staging/commit/push; результат публикации записать отдельно по фактическому remote SHA. Полное распространение на все ПК и внедрение project profiles остаются невыполненными внешними/интеграционными частями, не скрытым done.
+
+## Публикация и финальная проверка 2026-09-05
+
+- Strict release PASS: suite 128 tests + validator, prepared benchmark, bootstrap, architecture и isolated installer. Техническая приёмка HRE-006 5/5 PASS и stored freshness 5/5 true после commit; HRE-005 checkpoint остаётся историческим.
+- В commit вошли ровно 26 проверенных source/evidence файлов HRE-005/HRE-006. Private registry, rollout report, protected snapshots, runtime, Graphify и AGENTS.md исключены. Staged diff-check и secret-marker check PASS; все 18 staged/committed Git blobs совпали с raw-byte release manifest.
+- Release commit: 7fb53b48061d91af8bc81c7f551755ca3419fb81. Atomic non-force push прошёл в существующую ветку codex/hre-004-update-watcher и новый annotated tag harness-v2026.09.05-hre006.1. `git ls-remote` независимо подтвердил этот SHA и для ветки, и для dereferenced tag. Main не обновлялся; на другом ПК нужно брать именно этот tag, не предполагать свежесть default branch.
+- G01–G03 и локальная разрешённая G04/G05 завершены. 19 current core installations не равны 19 принятым бизнес-сценариям. Другие ПК, десять deferred проектов, SEO merge и project profiles остаются явно непокрытыми; будущего фонового автообновления нет.
+
+## Дополнительная проверка deferred после публикации
+
+- Graphify: фактический main checkout оказался clean, обязательный `git pull --ff-only origin main` вернул Already up to date. Установка того же опубликованного payload разрешена штатно и завершена; 18 source-bound hashes, receipt, повторный read-only plan и validator-example PASS. Генераторы/конфигурация портфеля/графы/заметки не менялись; rebuild не потребовался. Итоговая матрица: 20 current, 9 deferred, 1 SEO conflict, 1 source = 31.
+- Open Design: независимый полный read AGENTS подтвердил TypeScript-first для новых owned modules/scripts. Python control-plane требует явного исключения владельца; AGENTS не редактировался.
+- CRM Логолэнд / microchips-next-site: полный read инструкций подтвердил fresh-task после compaction и own-branch/PR или git-only integration. Проверены текущие ветки security-hardening/readiness-80-loop с 13/499 существующими изменениями. Новая задача/перенос или project PR не создавались без отдельного разрешения; чужую ветку не присваиваем.
+- Востановление акб: прямое требование `graphify update .` после code change означает дополнительную запись в индекс другого проекта, которой offline delivery не занимается. Нужен согласованный slice core+index, а не половинная установка.
+- ТЕндер QWEN: `.git` — обычный пустой каталог, 0 entries, HEAD отсутствует. Это ломает evidence fingerprint (git-state unavailable вместо non-Git fallback). Ни удаление маркера, ни git init не выполнялись без решения владельца.
+- Таким образом причины оставшихся deferred подтверждены чтением/наблюдением, а не общим предположением «нужна проверка». Active-задачи и denied Git inventory также остались нетронутыми.
