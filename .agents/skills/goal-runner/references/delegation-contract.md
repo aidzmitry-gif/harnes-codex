@@ -6,6 +6,7 @@
 Chain/subgoal:
 Role and model intent:
 Observable outcome:
+Prepared inputs, user action, expected visible result, evidence location:
 Scope and owned paths/worktree:
 Commit authority: none | isolated-worktree checkpoint
 First sufficient laziness-ladder rung:
@@ -59,6 +60,7 @@ Reject reports that omit evidence, hide failing checks, exceed ownership, or cla
 ## Communication
 
 - Report upward to the assigned lead or primary orchestrator.
+- Return a blocker once with its affected scope and observable resume condition; do not ask the user directly or repeat a failed access attempt without changed prerequisites. The primary continues independent authorized work and batches decisions.
 - Message peers only for a named dependency and copy the distilled conclusion upward.
 - Keep raw logs in the agent task or an approved artifact; return only the relevant excerpt and location.
 - A child may spawn descendants only when its packet grants a positive slot quota and names allowed roles. Default quota is zero.

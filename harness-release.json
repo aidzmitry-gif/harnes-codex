@@ -1,0 +1,25 @@
+{
+  "bundleHash": "d88bc538bffe252f73a726c454480718bdd34671a25cca877bed7bdf8cf11dbf",
+  "files": {
+    "acceptance_gate.py": "9d1e66fb2ca00e2a24091c6ef0e94dc00e035ebdc4f5c041f98a7b2bf25689d7",
+    "docs/ENGINEERING_LOOP.md": "d4ec21f6661a2ae4f62c56a74156540fbf9837aa469920bea95f3da851019f51",
+    "goal_orchestrator.py": "e1dd9dcd42488d60496ee9868b468ae3d312b4b0de37275661196cfb3bf42926",
+    "goal_progress.py": "69518af994a07c1340072fc36961da2f4efe269315742266bb44372ef980161d",
+    "goal_runner_validator.py": "c7204b7a192220e16a91639a9dd75bb375e2f100ac8f80dd6cfd30146adde20b",
+    "harness_benchmark.py": "6f32d58959e5cb733fbe578ff4b9a0446f557537459914f0170130488bdc0317",
+    "harness_metrics.py": "60fe3358d733824052df8a1a43ffea66d9fbc60dc0d8f31e49e4acdd31c6f61b",
+    "scripts/Invoke-HarnessGate.ps1": "0082ac86fa21b652f4f3541914b2011a6f4896698e80d349ed328ceffa8062d3",
+    "templates/acceptance.example.json": "8d56fec9cd5252cfd80984184bd52b60f57e00d026670593849d4b47f75bdddd",
+    "templates/goal-passport.example.json": "edaef5eb0baa7cbd24d13e850a09b00f3369d5f949156e18e8b0de57477fd28a",
+    "templates/project-profile.example.json": "7e44e9cbf0b05863d37a2f462d79ae06cb403f303659d7d43490e829a6f7f190",
+    "templates/update-batch.example.json": "292c349a5a7c7abb4021072318cb9d3e28b0e0e6dbf9e2680582302fd3680466",
+    "templates/update-candidate.example.json": "82a06aa7fbbe4b9513eb84c976c913be66e30ea1e9da423e5fa7ceea21c21b61",
+    "templates/update-radar-task.md": "c0f5a8addd5972fc9e3211b20554b13950a68d5d8d34878b60428d9ad6fa5237",
+    "templates/work-item.md": "16dab1187fe9c62a80066a838ed7ecb975000b90b7f110daafe461ea62fb4f0f",
+    "tests/fixtures/hre-001-benchmark.json": "ed2631e08f6b4d9db9ab6fbf1125f733f528a39ccf2cb6ae10d020c6b9370203",
+    "update_impact.py": "1d926997d76cd4fe7a780559a9da7ea40cf309601ef2cdc9bb72afdefbc006d6",
+    "update_radar.py": "d5043ff280bd3db60ee63a0fd336794c17b2d257cf791966bb6b0ef79e054388"
+  },
+  "releaseId": "2026.09.05-hre006.1",
+  "schemaVersion": 1
+}

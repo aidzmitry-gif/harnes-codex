@@ -7,6 +7,12 @@
       "command": "replace-with-a-safe-project-command"
     },
     {
+      "id": "user-scenario",
+      "kind": "manual",
+      "description": "Run the work item's prepared input -> action -> expected output scenario; inspect the actual result and record fresh artifact/view evidence. State local verification, deployment and user acceptance separately.",
+      "evidence": ""
+    },
+    {
       "id": "review",
       "kind": "manual",
       "description": "Diff review confirms scope, compatibility, security and rollback.",

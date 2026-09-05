@@ -72,19 +72,68 @@ class GoalOrchestratorTests(unittest.TestCase):
 
         result = plan_actions(passport, "running")
 
-        self.assertEqual(["hold"], [action["action"] for action in result["actions"]])
+        self.assertEqual(["hold", "launch"], [action["action"] for action in result["actions"]])
         self.assertEqual("agent_blocked", result["actions"][0]["reason"])
-        self.assertNotIn("launch", [action["action"] for action in result["actions"]])
+        self.assertEqual("G03", result["actions"][1]["subgoalId"])
 
-    def test_blocked_subgoal_globally_suppresses_other_ready_launches(self):
+    def test_blocked_subgoal_allows_independent_ready_launch(self):
         passport = self.passport()
         passport["subgoals"][1]["status"] = "blocked"
         passport["subgoals"].append({"id": "G03", "dependsOn": ["G01"], "wave": 3, "status": "ready", "execution": "subagent", "model": "terra", "worktree": "g03", "ownedPaths": ["g03.py"]})
 
         result = plan_actions(passport, "running")
 
-        self.assertEqual(["hold"], [action["action"] for action in result["actions"]])
+        self.assertEqual(["hold", "launch"], [action["action"] for action in result["actions"]])
         self.assertEqual("subgoal_blocked", result["actions"][0]["reason"])
+        self.assertEqual("G03", result["actions"][1]["subgoalId"])
+
+    def test_blocked_dependency_closure_never_launches_or_continues_descendants(self):
+        passport = self.passport()
+        passport["subgoals"][1]["status"] = "done"
+        passport["subgoals"].extend([
+            {"id": "G03", "dependsOn": ["G02"], "wave": 3, "status": "done", "execution": "subagent", "model": "terra", "worktree": "g03", "ownedPaths": ["g03.py"]},
+            {"id": "G04", "dependsOn": ["G03"], "wave": 4, "status": "ready", "execution": "subagent", "model": "terra", "worktree": "g04", "ownedPaths": ["g04.py"]},
+            {"id": "G05", "dependsOn": ["G01"], "wave": 2, "status": "ready", "execution": "subagent", "model": "terra", "worktree": "g05", "ownedPaths": ["g05.py"]},
+        ])
+        passport["agents"] = [{"id": "blocked", "subgoalId": "G02", "role": "worker", "depth": 1, "worktree": "g02", "ownedPaths": ["x.py"], "status": "blocked", "writer": True}]
+        before = copy.deepcopy(passport)
+        result = plan_actions(passport, "running")
+        self.assertEqual(["G05"], [x["subgoalId"] for x in result["actions"] if x["action"] == "launch"])
+        self.assertIn(("G04", "dependency_blocked"), [(x["subgoalId"], x["reason"]) for x in result["actions"]])
+        self.assertEqual(before, passport)
+        passport["agents"].append({"id": "active", "subgoalId": "G04", "role": "reviewer", "depth": 1, "worktree": None, "ownedPaths": [], "status": "active", "writer": False})
+        result = plan_actions(passport, "running")
+        self.assertIn(("hold", "active", "dependency_blocked"), [(x["action"], x["agentId"], x["reason"]) for x in result["actions"]])
+
+    def test_local_hold_never_overrides_global_pause_or_authority(self):
+        passport = self.passport()
+        passport["subgoals"][1]["status"] = "blocked"
+        passport["subgoals"].append({"id": "G03", "dependsOn": ["G01"], "wave": 2, "status": "ready", "execution": "subagent", "model": "terra", "worktree": "g03", "ownedPaths": []})
+        for state in ("paused", "blocked"):
+            self.assertNotIn("launch", [x["action"] for x in plan_actions(passport, state)["actions"]])
+        passport["chain"].update(standingChainAuthorization="absent", standingAuthorizationScope=None)
+        self.assertNotIn("launch", [x["action"] for x in plan_actions(passport, "running")["actions"]])
+
+    def test_blocked_current_checkout_and_running_primary_named_worktree_are_reserved(self):
+        passport = self.passport()
+        passport["subgoals"].append({"id": "G03", "dependsOn": ["G01"], "wave": 2, "status": "ready", "execution": "primary", "model": "sol", "worktree": None, "ownedPaths": ["other.py"]})
+        passport["agents"] = [{"id": "writer", "subgoalId": "G02", "role": "worker", "depth": 1, "worktree": None, "ownedPaths": ["x.py"], "status": "blocked", "writer": True}]
+        self.assertNotIn("launch", [x["action"] for x in plan_actions(passport, "running")["actions"]])
+        passport["agents"] = []
+        passport["subgoals"][1].update(status="running", execution="primary", worktree="shared")
+        passport["subgoals"][2]["worktree"] = "SHARED"
+        result = plan_actions(passport, "running")
+        self.assertNotIn("launch", [x["action"] for x in result["actions"]])
+        self.assertIn("worktree_busy", [x["reason"] for x in result["actions"]])
+
+    def test_same_worktree_is_not_independent_writing(self):
+        passport = self.passport()
+        passport["subgoals"].append({"id": "G03", "dependsOn": ["G01"], "wave": 2, "status": "ready", "execution": "subagent", "model": "terra", "worktree": "G02", "ownedPaths": ["other.py"]})
+        for status in ("active", "blocked"):
+            passport["agents"] = [{"id": "writer", "subgoalId": "G02", "role": "worker", "depth": 1, "worktree": "g02", "ownedPaths": ["x.py"], "status": status, "writer": True}]
+            self.assertNotIn("launch", [x["action"] for x in plan_actions(passport, "running")["actions"]])
+        passport["agents"] = []
+        self.assertEqual(["G02"], [x["subgoalId"] for x in plan_actions(passport, "running")["actions"] if x["action"] == "launch"])
 
     def test_non_executable_chain_statuses_hold_without_launch(self):
         for status in ("planning", "verifying", "awaiting-user-review"):

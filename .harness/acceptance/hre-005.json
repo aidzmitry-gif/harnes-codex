@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 2,
+  "workItem": "hre-005",
+  "criteria": [
+    {
+      "id": "release",
+      "kind": "command",
+      "description": "Full configured local release gate, including regression, architecture, isolated installer checks.",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-HarnessGate.ps1 -Stage release -Strict",
+      "timeoutSeconds": 300,
+      "checkedAt": "2026-09-05T08:14:58.068906+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "b706d465148fb7cf27003385ded15ea62b188c56c62f37dd2c63492062d693e0",
+        "status": "ok"
+      },
+      "passes": true,
+      "evidence": "auto: exit 0; PASS Harness gate 'release' passed.",
+      "durationMs": 24375
+    },
+    {
+      "id": "passport",
+      "kind": "command",
+      "description": "Current owner-maintained HRE-005 passport validates.",
+      "command": "python goal_runner_validator.py check .harness/work/hre-005.passport.json",
+      "checkedAt": "2026-09-05T08:15:22.435951+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "b706d465148fb7cf27003385ded15ea62b188c56c62f37dd2c63492062d693e0",
+        "status": "ok"
+      },
+      "passes": true,
+      "evidence": "auto: exit 0; PASS goal passport is valid",
+      "durationMs": 375
+    },
+    {
+      "id": "baseline",
+      "kind": "command",
+      "description": "Protected AGENTS.md baseline and diff formatting remain intact.",
+      "command": "python -c \"import hashlib; from pathlib import Path; assert hashlib.sha256(Path('AGENTS.md').read_bytes()).hexdigest()=='b0184c9d679de0622e8f42f9673132007c3bb4e3bf18af85a44845e9e4d116bf'; print('PASS AGENTS baseline unchanged')\"",
+      "checkedAt": "2026-09-05T08:15:22.812662+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "b706d465148fb7cf27003385ded15ea62b188c56c62f37dd2c63492062d693e0",
+        "status": "ok"
+      },
+      "passes": true,
+      "evidence": "auto: exit 0; PASS AGENTS baseline unchanged",
+      "durationMs": 328
+    },
+    {
+      "id": "user-scenario",
+      "kind": "manual",
+      "description": "Prepared isolated CLI scenarios demonstrate retained pending evaluation, idempotent resolution and independent safe DAG progress; local-only handoff.",
+      "evidence": "2026-09-05 local demo: scripts/Test-GoalRunnerArchitecture.ps1 PASS on UUID-isolated state, scan meaningful pending -> repeat pending with changed=false -> resolve no-benefit -> exact repeat no-meaningful-updates. Prepared GoalOrchestratorTests passport with blocked G02 and independent ready G03: plan_actions(p,running) returned hold G02 and launch G03 on independent worktree; asserted exact action pairs. 16 radar tests and 44 planner/validator tests PASS, including same-worktree hold. This demonstrates local CLI/planner behavior only; no actual delegated launch, scheduler adoption, live state migration, deployment or user acceptance.",
+      "passes": true,
+      "checkedAt": "2026-09-05T08:11:17.924574+00:00",
+      "durationMs": 0,
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "b706d465148fb7cf27003385ded15ea62b188c56c62f37dd2c63492062d693e0",
+        "status": "ok"
+      }
+    },
+    {
+      "id": "review",
+      "kind": "manual",
+      "description": "Independent correctness followed by simplify review; scope and single-writer limit disclosed.",
+      "evidence": "2026-09-05 independent /root/hre005_verify: correctness/security followed by simplify accepted for G01-G06. G01 filled-user-scenario forward test; G02 durable pending and resolve accepted only under documented serialized single-writer ownership; G03 two occupancy regression defects reproduced, corrected and independently rechecked with 44 tests PASS. Final integration review accepted context freshness, retained approval/access boundaries, isolated architecture/installer tests, unchanged AGENTS hash; no new dependency or evidence engine. Durable passport now G06 done and awaiting-user-review; source fingerprint final, live automation/global installation unchanged.",
+      "passes": true,
+      "checkedAt": "2026-09-05T08:11:18.285152+00:00",
+      "durationMs": 0,
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "b706d465148fb7cf27003385ded15ea62b188c56c62f37dd2c63492062d693e0",
+        "status": "ok"
+      }
+    }
+  ]
+}

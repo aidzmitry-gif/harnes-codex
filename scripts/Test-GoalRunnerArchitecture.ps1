@@ -22,7 +22,7 @@ $updateCandidate = Join-Path $root 'templates\update-candidate.example.json'
 $updateRadar = Join-Path $root 'update_radar.py'
 $updateBatch = Join-Path $root 'templates\update-batch.example.json'
 $updateRadarTask = Join-Path $root 'templates\update-radar-task.md'
-$updateRadarState = Join-Path $root '.harness\runtime\architecture-update-radar-state.json'
+$updateRadarState = Join-Path $root ('.harness\runtime\architecture-update-radar-{0}.json' -f [guid]::NewGuid().ToString('N'))
 
 $pythonCheck = @'
 import json, sys, tomllib
@@ -77,10 +77,22 @@ if ($LASTEXITCODE -ne 0) { throw 'Parent Goal action planner rejected the valid 
 & python $updateImpact classify $updateCandidate | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Update impact radar rejected the valid example candidate.' }
 
-Remove-Item -LiteralPath $updateRadarState -Force -ErrorAction SilentlyContinue
-& python $updateRadar scan $updateBatch --state $updateRadarState | Out-Null
-if ($LASTEXITCODE -ne 0) { throw 'Autonomous update watcher rejected the valid example batch.' }
-Remove-Item -LiteralPath $updateRadarState -Force -ErrorAction SilentlyContinue
+try {
+    $firstScan = & python $updateRadar scan $updateBatch --state $updateRadarState | ConvertFrom-Json
+    if ($LASTEXITCODE -ne 0 -or $firstScan.pendingCount -lt 1) { throw 'Watcher did not preserve the actionable example as pending.' }
+    $repeatScan = & python $updateRadar scan $updateBatch --state $updateRadarState | ConvertFrom-Json
+    if ($LASTEXITCODE -ne 0 -or $repeatScan.stateChanged -or $repeatScan.status -ne 'pending-evaluation') { throw 'Repeated scan lost pending evaluation or wrote duplicate state.' }
+    $fixtureHash = (Get-FileHash -LiteralPath $updateBatch -Algorithm SHA256).Hash.ToLowerInvariant()
+    foreach ($pending in $firstScan.pending) {
+        & python $updateRadar resolve $pending.id --digest $pending.digest --outcome no-benefit --evidence-hash $fixtureHash --state $updateRadarState | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'Isolated fixture resolution failed.' }
+    }
+    $resolvedScan = & python $updateRadar scan $updateBatch --state $updateRadarState | ConvertFrom-Json
+    if ($LASTEXITCODE -ne 0 -or $resolvedScan.pendingCount -ne 0 -or $resolvedScan.stateChanged) { throw 'Resolved fixture was proposed again.' }
+    Write-Host 'PASS isolated radar CLI: pending survives repeat; resolved repeat is quiet.'
+} finally {
+    if (Test-Path -LiteralPath $updateRadarState) { Remove-Item -LiteralPath $updateRadarState -Force }
+}
 
 $skillText = Get-Content -LiteralPath $skill -Raw
 $goalStateText = Get-Content -LiteralPath $goalState -Raw

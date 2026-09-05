@@ -13,6 +13,9 @@ Use one parent work item as the durable source of truth. Keep `.harness/CONTEXT.
 - Risk class: low | medium | high
 - External-side-effect boundary:
 - Parent outcome:
+- User-visible scenario: prepared inputs -> action -> expected output -> evidence
+- Delivery boundary: local-verified | deployed | user-accepted (only what is evidenced)
+- Blocker/resume condition: affected subgoal, required access/decision/evidence, next safe independent work
 - Status: planning | approved | running | verifying | awaiting-user-review | complete | blocked
 - Plan revision: 1
 - Approved passport revision:
@@ -67,6 +70,7 @@ Use one parent work item as the durable source of truth. Keep `.harness/CONTEXT.
 ## State rules
 
 - Let only the primary orchestrator edit these sections.
+- Reuse the approved contract across safe continuation; do not request the same authority again. Record a blocker with its affected scope and observable resume condition. Do not infer user acceptance or deployment from a green local test.
 - Use stable subgoal IDs; never renumber completed work.
 - Record concise evidence and paths, not full logs or transcripts.
 - A subgoal becomes `done` only after its acceptance check passes.

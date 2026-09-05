@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 2,
+  "workItem": "hre-006",
+  "criteria": [
+    {
+      "id": "release",
+      "kind": "command",
+      "description": "Full strict local release, including distribution, portability and isolated installer tests.",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-HarnessGate.ps1 -Stage release -Strict",
+      "timeoutSeconds": 300,
+      "passes": true,
+      "evidence": "auto: exit 0; PASS Harness gate 'release' passed.",
+      "checkedAt": "2026-09-05T09:29:35.743306+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "5be9b2c03489ea652fabe01c3f0a5d79af9b38832819c94bb092614e80436273",
+        "status": "ok"
+      },
+      "durationMs": 36687
+    },
+    {
+      "id": "bundle",
+      "kind": "command",
+      "description": "Exact source payload matches the fixed 18-file release manifest.",
+      "command": "python -c \"from pathlib import Path; import harness_distribution as h; m=h.load_release(Path.cwd())[0]; assert len(m['files'])==18; print('PASS source release '+m['releaseId'])\"",
+      "passes": true,
+      "evidence": "auto: exit 0; PASS source release 2026.09.05-hre006.1",
+      "checkedAt": "2026-09-05T09:30:12.431571+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "5be9b2c03489ea652fabe01c3f0a5d79af9b38832819c94bb092614e80436273",
+        "status": "ok"
+      },
+      "durationMs": 438
+    },
+    {
+      "id": "baseline",
+      "kind": "command",
+      "description": "Protected user AGENTS baseline remains byte-identical.",
+      "command": "python -c \"import hashlib; from pathlib import Path; assert hashlib.sha256(Path('AGENTS.md').read_bytes()).hexdigest()=='b0184c9d679de0622e8f42f9673132007c3bb4e3bf18af85a44845e9e4d116bf'; print('PASS AGENTS baseline unchanged')\"",
+      "passes": true,
+      "evidence": "auto: exit 0; PASS AGENTS baseline unchanged",
+      "checkedAt": "2026-09-05T09:30:12.872998+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "5be9b2c03489ea652fabe01c3f0a5d79af9b38832819c94bb092614e80436273",
+        "status": "ok"
+      },
+      "durationMs": 328
+    },
+    {
+      "id": "local-core-wave",
+      "kind": "manual",
+      "description": "Local managed-core rollout is verified without pretending project acceptance or other-PC installation.",
+      "passes": true,
+      "evidence": "2026-09-05: registered31 roots ->19 current,10 deferred,1 SEO conflict,1 source. Pilot installed18 then current changed=false. Primary verified19 source-bound receipts and18 hashes each; copied validator-example smoke19PASS. Compared155 protected path hashes/absence before-after:0 changes; raw private evidence retained only in ignored runtime. Every installed project has profileConfigured=false/projectAcceptance=not-run. Other PCs not connected, no remote installation or automatic scheduler claimed.",
+      "checkedAt": "2026-09-05T09:29:34.519541+00:00",
+      "durationMs": 0,
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "5be9b2c03489ea652fabe01c3f0a5d79af9b38832819c94bb092614e80436273",
+        "status": "ok"
+      }
+    },
+    {
+      "id": "review",
+      "kind": "manual",
+      "description": "Independent correctness and subsequent simplify review, including fixes and live receipt audit.",
+      "passes": true,
+      "evidence": "Independent fleet_verify correctness found strict registry and status defects; fixes verified using actual PowerShell wrapper. Portability review found autocrlf drift, fixed with exact18 LF attrs and regenerated manifest. Primary19targetedPASS11.626s; independent narrowed portability+wrapper2PASS9.561s. Final independent receipt audit19of19 exact current source,18hashes,zero locks; simplify pass accepted fixed allowlist,stdlib,native lock,bounded backups,no dependency or scheduler. Independent historical155-path comparison not claimed; its raw snapshots are primary evidence.",
+      "checkedAt": "2026-09-05T09:29:34.960654+00:00",
+      "durationMs": 0,
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "5be9b2c03489ea652fabe01c3f0a5d79af9b38832819c94bb092614e80436273",
+        "status": "ok"
+      }
+    }
+  ]
+}

@@ -12,6 +12,7 @@ Run one large outcome through a verified DAG of subgoals while keeping the main 
 - Treat invoking `$goal-runner <objective>` as authority to inspect and prepare a plan, not to deploy, migrate, publish, delete, handle secrets, or broaden sandbox access.
 - Before implementation or spawning workers, show the Goal passport and obtain one explicit approval of the decomposition and bounded orchestration policy.
 - Let that approval authorize only the listed Goal chain: planned subagents, child tasks, clean successor tasks, and assigned local worktrees. Keep normal approval and stop conditions.
+- Once bounded continuation is approved, complete every listed safe subgoal without asking the user to say "continue" between implementation, tests, corrections, and review. Reconfirm only a material scope/risk/authority change or a genuine stop condition; approval does not override sandbox permissions.
 - Never fork a task or copy its transcript. Never archive Goal-chain tasks until the user reviews the parent result and explicitly requests archive of the chain ID.
 - Keep one writer per checkout or worktree. If isolation cannot be proved, serialize writes.
 
@@ -19,8 +20,10 @@ Run one large outcome through a verified DAG of subgoals while keeping the main 
 
 1. Read applicable instructions, canonical project context, active work item, git state, configured checks, and only the files needed to locate the Goal boundary.
 2. Use an existing read-only Graphify graph when it materially reduces repository reading. Do not rebuild it merely to start a Goal.
+   Start from the canonical work item and current context, then at most five relevant source pointers; expand only for a concrete unanswered question. Check snapshot branch/revision/evidence freshness against the checkout. If context is stale, recover from the current passport and files, not the transcript. Graphify supplies navigation, never approval or a fabricated project goal.
 3. Create a stable chain ID such as `SEO-001` and one work item at `.harness/work/<goal-id>.md`. Do not create a competing project journal.
 4. Record the observable parent outcome, exclusions, invariants, acceptance checks, risk, rollback, and approval boundaries.
+   Define one user-visible acceptance scenario: safe prepared inputs, the action to perform, the expected observable output, and where fresh evidence will be recorded. For UI/export work, include a filled example and inspect the actual view/download, not just an HTTP status or successful build. Reuse the existing acceptance gate; distinguish local verification, deployment, and user acceptance.
 5. Read [goal-state.md](references/goal-state.md) when creating or resuming Goal state.
 6. Read [laziness-ladder.md](references/laziness-ladder.md) before the first implementation packet and every final code review.
 7. Create one owner-maintained executable plan snapshot at `.harness/work/<chain>.passport.json`, link it from the canonical work item, and run `python goal_runner_validator.py check <snapshot>`. The Markdown work item remains the decision journal; the snapshot is the runnable projection, not a competing source of truth.
@@ -44,6 +47,7 @@ Before execution, show the parent outcome and chain ID; total subgoals and phase
 - Allow at most two delegation levels below the primary orchestrator. A read-only child-goal lead may spawn only read-only descendants when its packet grants a slot quota and names allowed roles; the primary dispatches all workspace-write workers.
 - Prefer hub-and-spoke communication. Allow peer messages only for a named dependency.
 - Keep canonical Goal state single-writer: only the primary orchestrator updates the parent work item and `.harness/CONTEXT.md`.
+- Size the pool to independent work, not capacity: a small slice may need only the primary; add read-only exploration or verification when it has a concrete question. Keep support packets bounded rather than forwarding the whole conversation.
 
 Use separate regular tasks only for distinct long-lived outcomes or context boundaries. Use subagent tasks for bounded exploration, implementation, verification, tests, or log analysis. Name visible tasks `<CHAIN> · GNN · <result>`.
 
@@ -98,7 +102,7 @@ For each wave:
 
 - Keep one native Goal in the primary task. Use subagent tasks for bounded work and separate regular tasks only for distinct long-lived outcomes or safe context boundaries; do not create a native Goal for every short subgoal.
 - On primary Goal start/resume and after every accepted result or plan revision, run `python goal_orchestrator.py plan <passport> --parent-state running`. Use `paused` or `blocked` when that is the actual parent state. The planner validates the current passport and returns actions; it never presses UI controls, starts tasks, changes status, or writes files.
-- Interpret `launch` as permission to dispatch only the listed ready slice after one more current-passport validation. Interpret `wait` as a prohibition on duplicate work, `verify` as a requirement to reproduce evidence before marking the subgoal done, and `hold` as no new dispatch. An active child under a paused/blocked parent should reach a safe checkpoint and stop; do not claim the UI pause cascaded automatically.
+- Interpret `launch` as permission to dispatch only the listed ready slice after one more current-passport validation. Interpret `wait` as a prohibition on duplicate work and `verify` as a requirement to reproduce evidence before marking the subgoal done. A local `hold` (`subgoal_blocked`, `agent_blocked`, `dependency_blocked`, `worktree_busy`) stops that slice and affected dependencies, not independently authorized launches. Parent pause/block, a non-executable chain, or missing continuation authority remain global prohibitions. An active child under a paused/blocked parent should reach a safe checkpoint and stop; do not claim the UI pause cascaded automatically. Recheck actual writer isolation before dispatch; different goal IDs do not prove different worktrees.
 - Treat `complete` as a scheduling signal, not parent acceptance. The correctness review, simplify review, integration checks, fresh evidence, and parent acceptance in section 9 remain mandatory.
 - Return child blockers and user questions to the primary task. Batch decisions there so the user normally interacts with one Goal task rather than supervising each child.
 
@@ -106,7 +110,7 @@ For each wave:
 
 - For OpenAI/Codex changes, fetch the current official source first and write one bounded local candidate that keeps `facts`, `inferences`, and `assumptions` separate. Verify installed/local capability state independently; an API-only feature is not evidence that the current Codex runtime can use it.
 - Run `python update_impact.py classify <candidate.json>`. The classifier is offline, accepts only the official OpenAI documentation host allowlist, never executes source text, and returns `significant`, `evaluate`, or `ignore` with a transparent score.
-- For recurring review, pass a strict bounded batch to `python update_radar.py scan <batch.json> --state .harness/runtime/update-radar-state.json`. The watcher reuses the same classifier, stores only candidate IDs and SHA-256 digests, suppresses exact repeats, and fails closed on conflicting history before writing state.
+- For recurring review, pass a strict bounded batch to `python update_radar.py scan <batch.json> --state .harness/runtime/update-radar-state.json`. The single-writer watcher reuses the classifier and stores bounded IDs, digests, classification and resolution metadata, never source text. Exact repeats suppress new proposals but retain `pending` evaluations; legacy missing evaluation history stays unknown. Only after a real local check call `resolve` with the matching ID/digest, outcome and evidence hash as documented in `templates/update-radar-task.md`. The hash is a receipt, not proof of truth. Serialize scan/resolve for each state file; unchanged prerequisites do not justify repeated expensive checks.
 - `significant` means `run-local-evaluation`, not automatic adoption. Implement only after a representative local comparison shows a meaningful Harness gain and the normal Goal approval boundary permits the change. `evaluate` collects more evidence; `ignore` creates no work.
 - Keep Terra as the default for clear supporting work and Sol for ambiguity, architecture, risk, failed verification, and final synthesis. Use Luna or a higher reasoning mode only when the runtime actually exposes it and representative acceptance/eval evidence justifies the quality, latency, and usage tradeoff.
 - The local classifier and watcher do not schedule themselves or make network calls. After separate user authority, a report-only Scheduled Task may read the fixed official source set and call the watcher; it must not update Codex/Graphify, install plugins, edit source, commit, push, deploy, or adopt a recommendation automatically.

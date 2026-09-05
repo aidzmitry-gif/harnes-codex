@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "chain": {
+    "chainId": "HRE-005",
+    "projectRoot": "D:\\6 Проекты\\Харнес разработка",
+    "dataOwner": "workspace-owner",
+    "riskClass": "medium",
+    "externalSideEffectBoundary": "local Harness only; no AGENTS.md changes, external writes, commit, push, deploy, global install, live radar-state migration, secrets, or other-project edits",
+    "parentOutcome": "Autonomous completion of approved local work with observable acceptance, durable pending update evaluation, independent DAG progress, compact context and truthful efficiency evidence.",
+    "status": "awaiting-user-review",
+    "planRevision": 1,
+    "approvedPassportRevision": 1,
+    "approvalProvenance": "Current task, user message on 2026-09-05: подтверждаю HRE-005 revision 1. Bounded local continuation for all six stages; no commit/push or other-project writes.",
+    "canonicalWorkItemPath": ".harness/work/hre-005-autonomous-outcomes.md",
+    "checkoutWorktreePolicy": "primary is the only writer in the existing checkout; up to two read-only subagents; all writes serialized; no worktrees or additional regular tasks",
+    "globalAgentCap": 2,
+    "delegationDepthCap": 1,
+    "standingChainAuthorization": "approved",
+    "standingAuthorizationScope": "bounded continuation",
+    "currentVerifiedSubgoal": "G06",
+    "nextMinimalSliceAcceptance": "Local implementation and independent review complete; final fresh acceptance is recorded separately. User review only; publication, live adoption and a comparative pilot need separate authorization.",
+    "baselineId": "hre005-before-c60a0e0",
+    "treatmentId": "hre005-autonomous-v1",
+    "metricsPath": ".harness/metrics/hre-005.jsonl",
+    "metricsSchemaVersion": 1
+  },
+  "subgoals": [
+    {
+      "id": "P0",
+      "dependsOn": [],
+      "wave": 1,
+      "status": "done",
+      "execution": "primary",
+      "model": "sol",
+      "worktree": null,
+      "ownedPaths": [
+        ".harness/work/hre-005-autonomous-outcomes.md",
+        ".harness/work/hre-005.passport.json"
+      ]
+    },
+    {
+      "id": "G01",
+      "dependsOn": [
+        "P0"
+      ],
+      "wave": 2,
+      "status": "done",
+      "execution": "primary",
+      "model": "sol",
+      "worktree": null,
+      "ownedPaths": [
+        "templates/work-item.md",
+        "templates/acceptance.example.json",
+        "docs/ENGINEERING_LOOP.md",
+        ".agents/skills/goal-runner/SKILL.md",
+        ".agents/skills/goal-runner/references/goal-state.md",
+        ".agents/skills/goal-runner/references/delegation-contract.md"
+      ]
+    },
+    {
+      "id": "G02",
+      "dependsOn": [
+        "G01"
+      ],
+      "wave": 3,
+      "status": "done",
+      "execution": "primary",
+      "model": "sol",
+      "worktree": null,
+      "ownedPaths": [
+        "update_radar.py",
+        "tests/test_update_radar.py",
+        "templates/update-radar-task.md",
+        "templates/update-batch.example.json"
+      ]
+    },
+    {
+      "id": "G03",
+      "dependsOn": [
+        "G01"
+      ],
+      "wave": 3,
+      "status": "done",
+      "execution": "primary",
+      "model": "sol",
+      "worktree": null,
+      "ownedPaths": [
+        "goal_orchestrator.py",
+        "tests/test_goal_orchestrator.py",
+        ".agents/skills/goal-runner/SKILL.md"
+      ]
+    },
+    {
+      "id": "G04",
+      "dependsOn": [
+        "G02",
+        "G03"
+      ],
+      "wave": 4,
+      "status": "done",
+      "execution": "primary",
+      "model": "sol",
+      "worktree": null,
+      "ownedPaths": [
+        ".harness/CONTEXT.md",
+        "templates/work-item.md",
+        "docs/ENGINEERING_LOOP.md",
+        "README.md",
+        ".agents/skills/goal-runner/SKILL.md"
+      ]
+    },
+    {
+      "id": "G05",
+      "dependsOn": [
+        "G04"
+      ],
+      "wave": 5,
+      "status": "done",
+      "execution": "primary",
+      "model": "sol",
+      "worktree": null,
+      "ownedPaths": [
+        "docs/ENGINEERING_LOOP.md",
+        "templates/work-item.md",
+        "scripts/Test-GoalRunnerArchitecture.ps1",
+        "README.md"
+      ]
+    },
+    {
+      "id": "G06",
+      "dependsOn": [
+        "G05"
+      ],
+      "wave": 6,
+      "status": "done",
+      "execution": "primary",
+      "model": "sol",
+      "worktree": null,
+      "ownedPaths": [
+        ".harness/acceptance/hre-005.json",
+        ".harness/metrics/hre-005.jsonl",
+        ".harness/work/hre-005-autonomous-outcomes.md",
+        ".harness/work/hre-005.passport.json",
+        ".harness/CONTEXT.md"
+      ]
+    }
+  ],
+  "agents": [
+    {
+      "id": "/root/hre005_plan_check",
+      "subgoalId": "P0",
+      "role": "harness_goal_explorer",
+      "depth": 1,
+      "status": "done",
+      "writer": false,
+      "worktree": null,
+      "ownedPaths": []
+    },
+    {
+      "id": "/root/hre005_verify",
+      "subgoalId": "G06",
+      "role": "harness_goal_verifier",
+      "depth": 1,
+      "status": "done",
+      "writer": false,
+      "worktree": null,
+      "ownedPaths": []
+    }
+  ],
+  "goalProgress": {
+    "schemaVersion": 1,
+    "attempts": [
+      {
+        "chainId": "HRE-005",
+        "subgoalId": "G03",
+        "strategyId": "worktree-occupancy",
+        "repositoryFingerprint": {
+          "algorithm": "sha256",
+          "status": "ok",
+          "value": "e20945fbf9091f635eac84708db23fe9536182cb237f7ae8cb6aa7514db28af8"
+        },
+        "unlockEvidenceFingerprint": null
+      }
+    ]
+  }
+}
