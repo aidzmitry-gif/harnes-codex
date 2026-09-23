@@ -39,6 +39,18 @@ try {
     )
     & powershell @installArgs
     if ($LASTEXITCODE -ne 0) { throw 'First isolated install failed.' }
+    $installedConfig = Get-Content -LiteralPath $configPath -Raw
+    if (-not $installedConfig.Contains('default_subagent_model = "gpt-6-luna"') -or -not $installedConfig.Contains('default_subagent_reasoning_effort = "xhigh"')) {
+        throw 'Installed defaults do not match the approved Luna xhigh profile.'
+    }
+    foreach ($role in @('worker', 'explorer', 'lead', 'verifier')) {
+        $installedRole = Get-Content -LiteralPath (Join-Path $rolesPath "harness-goal-$role.toml") -Raw
+        $expectedModel = if ($role -in @('worker', 'explorer')) { 'gpt-6-luna' } elseif ($role -eq 'lead') { 'gpt-6-sol' } else { 'gpt-6-astra' }
+        $expectedEffort = if ($role -eq 'lead') { 'high' } else { 'xhigh' }
+        if (-not $installedRole.Contains("model = `"$expectedModel`"") -or -not $installedRole.Contains("model_reasoning_effort = `"$expectedEffort`"")) {
+            throw "Installed role has an unexpected model or effort: $role"
+        }
+    }
     $manifestPath = Join-Path $configDir 'goal-runner-install.json'
     if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw 'Installer did not create a durable manifest.' }
     $firstConfigHash = (Get-FileHash -LiteralPath $configPath).Hash

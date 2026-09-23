@@ -125,6 +125,7 @@ def plan_actions(passport: object, parent_state: str) -> dict[str, Any]:
                     "ready",
                     execution=subgoal["execution"],
                     model=subgoal["model"],
+                    **({'reasoningEffort': subgoal['reasoningEffort']} if 'reasoningEffort' in subgoal else {}),
                     worktree=subgoal["worktree"],
                     ownedPaths=subgoal["ownedPaths"],
                 )

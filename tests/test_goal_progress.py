@@ -16,6 +16,12 @@ from tests.test_goal_runner_validator import valid_passport
 FINGERPRINT = {"algorithm": "sha256", "status": "ok", "value": "a" * 64}
 
 
+def local_passport():
+    passport = valid_passport()
+    passport["chain"]["projectRoot"] = str(Path.cwd())
+    return passport
+
+
 class GoalProgressTests(unittest.TestCase):
     def invoke(self, action="check", strategy="minimal"):
         return goal_progress.main([action, "passport.json", "G02", strategy])
@@ -24,7 +30,7 @@ class GoalProgressTests(unittest.TestCase):
     @patch("goal_progress.Path.read_text")
     @patch("goal_progress.acceptance_gate.fingerprint", return_value=FINGERPRINT)
     def test_first_attempt_checks_then_records_and_passport_stays_valid(self, _, read_text, save_atomic):
-        read_text.return_value = json.dumps(valid_passport())
+        read_text.return_value = json.dumps(local_passport())
         self.assertEqual(0, self.invoke())
         self.assertEqual(0, self.invoke("record"))
         stored = save_atomic.call_args.args[1]
@@ -35,7 +41,7 @@ class GoalProgressTests(unittest.TestCase):
     @patch("goal_progress.Path.read_text")
     @patch("goal_progress.acceptance_gate.fingerprint", return_value=FINGERPRINT)
     def test_exact_repeat_is_no_progress_and_check_is_read_only(self, _, read_text, save_atomic):
-        passport = valid_passport()
+        passport = local_passport()
         read_text.return_value = json.dumps(passport)
         self.assertEqual(0, self.invoke("record"))
         recorded = save_atomic.call_args.args[1]
@@ -48,13 +54,13 @@ class GoalProgressTests(unittest.TestCase):
     @patch("goal_progress.Path.read_text")
     @patch("goal_progress.acceptance_gate.fingerprint", return_value=FINGERPRINT)
     def test_changed_strategy_is_new_attempt(self, _, read_text, save_atomic):
-        read_text.return_value = json.dumps(valid_passport())
+        read_text.return_value = json.dumps(local_passport())
         self.assertEqual(0, self.invoke("record"))
         read_text.return_value = json.dumps(save_atomic.call_args.args[1])
         self.assertEqual(0, self.invoke(strategy="alternate"))
 
     @patch("goal_progress.save_atomic")
-    @patch("goal_progress.Path.read_text", return_value=json.dumps(valid_passport()))
+    @patch("goal_progress.Path.read_text", return_value=json.dumps(local_passport()))
     @patch("goal_progress.acceptance_gate.fingerprint")
     def test_changed_repository_fingerprint_is_new_attempt(self, mocked_fingerprint, read_text, save_atomic):
         mocked_fingerprint.return_value = FINGERPRINT
@@ -70,7 +76,7 @@ class GoalProgressTests(unittest.TestCase):
     @patch("goal_progress.acceptance_gate.fingerprint", return_value=FINGERPRINT)
     @patch("goal_progress.acceptance_gate.load")
     def test_evidence_text_does_not_change_attempt_signature(self, mocked_load, _, __, read_text, save_atomic):
-        passport = valid_passport(); passport["subgoals"][1]["unlockEvidence"] = {"workItem": "hre-002", "criterionId": "acceptance"}
+        passport = local_passport(); passport["subgoals"][1]["unlockEvidence"] = {"workItem": "hre-002", "criterionId": "acceptance"}
         read_text.return_value = json.dumps(passport)
         criterion = {"id": "acceptance", "kind": "manual", "passes": True, "evidence": "first", "fingerprint": FINGERPRINT}
         mocked_load.return_value = {"criteria": [criterion]}
@@ -85,7 +91,7 @@ class GoalProgressTests(unittest.TestCase):
     @patch("goal_progress.acceptance_gate.fingerprint", return_value=FINGERPRINT)
     @patch("goal_progress.acceptance_gate.load")
     def test_changed_structured_evidence_state_is_new_attempt(self, mocked_load, _, __, read_text, save_atomic):
-        passport = valid_passport(); passport["subgoals"][1]["unlockEvidence"] = {"workItem": "hre-002", "criterionId": "acceptance"}
+        passport = local_passport(); passport["subgoals"][1]["unlockEvidence"] = {"workItem": "hre-002", "criterionId": "acceptance"}
         read_text.return_value = json.dumps(passport)
         criterion = {"id": "acceptance", "kind": "manual", "passes": False, "evidence": "saved", "fingerprint": FINGERPRINT}
         mocked_load.return_value = {"criteria": [criterion]}
@@ -97,20 +103,20 @@ class GoalProgressTests(unittest.TestCase):
     @patch("goal_progress.Path.read_text")
     @patch("goal_progress.acceptance_gate.fingerprint", return_value=FINGERPRINT)
     def test_malformed_state_fails_closed(self, _, read_text):
-        passport = valid_passport(); passport["goalProgress"] = {"schemaVersion": 1, "attempts": [{"chainId": "HRE-001"}]}
+        passport = local_passport(); passport["goalProgress"] = {"schemaVersion": 1, "attempts": [{"chainId": "HRE-001"}]}
         read_text.return_value = json.dumps(passport)
         self.assertEqual(2, self.invoke())
 
     @patch("goal_progress.save_atomic")
     @patch("goal_progress.Path.read_text")
     def test_invalid_passport_is_not_recorded(self, read_text, save_atomic):
-        passport = valid_passport(); passport["chain"]["riskClass"] = "invalid"
+        passport = local_passport(); passport["chain"]["riskClass"] = "invalid"
         read_text.return_value = json.dumps(passport)
         self.assertEqual(2, self.invoke("record"))
         save_atomic.assert_not_called()
 
     def test_record_cli_rejects_malformed_passport_without_write_or_traceback(self):
-        passport = valid_passport(); passport["chain"]["riskClass"] = []
+        passport = local_passport(); passport["chain"]["riskClass"] = []
         with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as handle:
             json.dump(passport, handle)
             path = Path(handle.name)
@@ -128,7 +134,7 @@ class GoalProgressTests(unittest.TestCase):
     @patch("goal_progress.Path.read_text")
     @patch("goal_progress.acceptance_gate.fingerprint", return_value=FINGERPRINT)
     def test_attempt_limit_fails_closed(self, _, read_text, save_atomic):
-        passport = valid_passport()
+        passport = local_passport()
         passport["goalProgress"] = {
             "schemaVersion": 1,
             "attempts": [
@@ -148,7 +154,7 @@ class GoalProgressTests(unittest.TestCase):
 
     @patch("goal_progress.acceptance_gate.fingerprint", return_value=FINGERPRINT)
     def test_recorded_state_is_excluded_but_other_passport_state_is_tracked(self, mocked_fingerprint):
-        passport = valid_passport()
+        passport = local_passport()
         path = Path("passport.json")
         first = goal_progress.attempt_signature(passport, path, "G02", "minimal")
         recorded = deepcopy(passport)
@@ -156,7 +162,28 @@ class GoalProgressTests(unittest.TestCase):
         self.assertEqual(first, goal_progress.attempt_signature(recorded, path, "G02", "minimal"))
         recorded["chain"]["parentOutcome"] = "changed"
         self.assertNotEqual(first, goal_progress.attempt_signature(recorded, path, "G02", "minimal"))
-        mocked_fingerprint.assert_called_with(ignored_paths={"passport.json"})
+        mocked_fingerprint.assert_called_with(
+            ignored_paths={"passport.json"}, repository_root=Path.cwd().resolve()
+        )
+
+    @patch("goal_progress.acceptance_gate.fingerprint", return_value=FINGERPRINT)
+    def test_repository_fingerprint_uses_passport_project_root(self, mocked_fingerprint):
+        repository_root = Path.cwd().parent.resolve()
+        passport = local_passport()
+        passport["chain"]["projectRoot"] = str(repository_root)
+        path = repository_root / "passport.json"
+
+        goal_progress.attempt_signature(passport, path, "G02", "cross-repository")
+
+        mocked_fingerprint.assert_called_once_with(
+            ignored_paths={"passport.json"}, repository_root=repository_root
+        )
+
+    def test_missing_passport_project_root_fails_closed(self):
+        passport = local_passport()
+        passport["chain"]["projectRoot"] = str(Path.cwd() / "missing-goal-root")
+        with self.assertRaisesRegex(goal_progress.ProgressError, "existing absolute directory"):
+            goal_progress.attempt_signature(passport, Path("passport.json"), "G02", "missing-root")
 
     @patch("goal_progress.Path.read_text")
     @patch("goal_progress.acceptance_gate.subprocess.run")
@@ -164,7 +191,7 @@ class GoalProgressTests(unittest.TestCase):
     @patch("goal_progress.acceptance_gate.fingerprint", return_value=FINGERPRINT)
     @patch("goal_progress.acceptance_gate.load")
     def test_referenced_command_evidence_never_executes_command(self, mocked_load, _, __, run, read_text):
-        passport = valid_passport(); passport["subgoals"][1]["unlockEvidence"] = {"workItem": "hre-002", "criterionId": "acceptance"}
+        passport = local_passport(); passport["subgoals"][1]["unlockEvidence"] = {"workItem": "hre-002", "criterionId": "acceptance"}
         read_text.return_value = json.dumps(passport)
         mocked_load.return_value = {"criteria": [{"id": "acceptance", "kind": "command", "command": "raise-error", "passes": True, "evidence": "saved", "fingerprint": FINGERPRINT}]}
         self.assertEqual(0, self.invoke())

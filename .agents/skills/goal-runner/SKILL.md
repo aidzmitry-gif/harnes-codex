@@ -1,6 +1,6 @@
 ---
 name: goal-runner
-description: Orchestrate a large Codex Goal as a dependency-aware graph of measurable subgoals, optionally across separate tasks and nested subagents, with adaptive parallelism, model routing, verification, context handoffs, and deferred chain archiving. Use when the user invokes `$goal-runner`, asks to split and execute a large goal, requests a master orchestrator with 10 or more agents, wants parallel goal waves, or needs token-efficient long-running project delivery.
+description: Execute an approved large Goal as a dependency-aware graph. Use for `$goal-runner`, explicit goal decomposition, parallel goal waves, or master orchestration; ordinary coding tasks do not need this skill.
 ---
 
 # Goal Runner
@@ -57,9 +57,11 @@ Use separate regular tasks only for distinct long-lived outcomes or context boun
 - Use `harness_goal_worker` for one approved minimal implementation slice.
 - Use `harness_goal_verifier` for independent acceptance and safety review.
 - Use `harness_goal_lead` as a read-only coordinator when a child goal needs its own small exploration or verification tree.
-- Prefer `gpt-5.6-terra` at medium or low effort for clear, read-heavy, repetitive, or supporting work.
-- Escalate ambiguity, architecture, security, migrations, cross-component integration, failed verification, and final synthesis to `gpt-5.6-sol` when available.
-- If a role or model is unavailable, record the fallback and preserve the verification level.
+- Source profile for new bounded implementation, tests, documentation and clear exploration: `gpt-6-luna` / `xhigh` to preserve the prior effort during migration. A clear low-risk slice with a targeted oracle may use Luna `low` or `medium` only when that exact plan is approved and acceptance remains intact. Use `gpt-6-sol` / `high` for everyday coding judgment, integration and child-goal coordination; use `gpt-6-astra` / `xhigh` for ambiguous contracts, security, permissions, migrations, complex debugging and final high-risk review. A narrow write packet may return to Luna after the contract is fixed.
+- These are routing hypotheses, not measured quality or savings. Compare the same scoped inputs, fresh acceptance and observed usage before claiming a faster/cheaper profile. Before dispatch, verify that the callable runtime exposes the exact model/effort: this Goal validator permits `low` through `max` for GPT-6 Sol/Luna, not API-only `none` or unsupported `ultra`. Put both `model` and `reasoningEffort` in new passports; the planner forwards them. Legacy `terra`/`sol`/`gpt-5.6-luna` passports stay unchanged until an approved revision.
+- Check the selected role's actual fixed model. If an installed role still pins Terra/Sol, do not claim to override it: use a model-selectable default agent with the same bounded role contract and explicit model/effort, only where delegation is authorized. Use a short packet (`fork_turns=none`), never a full-history fork with overrides. For `execution=primary`, record the actual current model; a plan cannot switch its own running model.
+- If the selected model is unavailable, hold the affected slice and request a fallback choice; do not silently substitute a cheaper model on high-risk work. Existing agents/global configuration are not rewritten by this skill.
+- After an unsuccessful implementation verification, narrow the contract once; if the same cause persists or safety is involved, ask Astra to diagnose before another write. Preserve the no-progress stop condition and all permission gates; switching models alone does not unlock a retry.
 
 Parallelize read-only work within the pool. For write work, assign file/component ownership, use separate git worktrees for independent goals, never let two agents write one checkout concurrently, serialize integration through the primary orchestrator, and do not create a worktree from an ambiguous or dirty base.
 
@@ -86,7 +88,7 @@ For each wave:
 6. Run a separate simplify review against the laziness ladder without weakening the safety floor.
 7. Accept, correct, retry once with a narrower contract, or mark blocked.
 8. Update status, ladder decision, simplifications, exceptions, evidence, registries, decisions, and the next wave in the parent work item.
-9. At meaningful run or accepted-subgoal checkpoints only, use `python harness_metrics.py record --file <metrics.jsonl> --from <event.json>`. Accept only bounded identifiers and structured fields; use actual runtime token counts or both `null`, never estimates, transcripts, or free text. Run paired compare only when valid pairs exist.
+9. At meaningful run or accepted-subgoal checkpoints only, use `python harness_metrics.py record --file <metrics.jsonl> --from <event.json>`. Include `failedAttempts` (integer or `null`) for schema 2; legacy schema 1 remains readable. Record one non-overlapping delta per unique `runId`, with `chainId`, actual model/effort and observed tokens (both `null` if unavailable). Do not sum cumulative usage snapshots, count child usage again inside the parent, or infer failures from checksFailed/reworkCount. Never store transcripts/free text. See [task-metrics.md](references/task-metrics.md) for the event contract and required task report.
 10. Treat `python harness_benchmark.py --fixture tests/fixtures/hre-001-benchmark.json` as a deterministic regression oracle for common-ground-truth quality semantics. It does not prove real-world token savings or statistical significance.
 11. Acceptance evidence is fresh only for the current relevant repository state; after a relevant change, run `acceptance_gate.py prove` again before accepting manual evidence.
 12. Before retrying the same subgoal, run `python goal_progress.py check <passport> <subgoal> <strategy>` and record a permitted attempt with `record`. `NO_PROGRESS` is a stop condition: change the bounded strategy, repository state, or structured fresh evidence before retrying; do not evade it by rewriting narrative evidence.
@@ -108,12 +110,7 @@ For each wave:
 
 ### Update impact radar
 
-- For OpenAI/Codex changes, fetch the current official source first and write one bounded local candidate that keeps `facts`, `inferences`, and `assumptions` separate. Verify installed/local capability state independently; an API-only feature is not evidence that the current Codex runtime can use it.
-- Run `python update_impact.py classify <candidate.json>`. The classifier is offline, accepts only the official OpenAI documentation host allowlist, never executes source text, and returns `significant`, `evaluate`, or `ignore` with a transparent score.
-- For recurring review, pass a strict bounded batch to `python update_radar.py scan <batch.json> --state .harness/runtime/update-radar-state.json`. The single-writer watcher reuses the classifier and stores bounded IDs, digests, classification and resolution metadata, never source text. Exact repeats suppress new proposals but retain `pending` evaluations; legacy missing evaluation history stays unknown. Only after a real local check call `resolve` with the matching ID/digest, outcome and evidence hash as documented in `templates/update-radar-task.md`. The hash is a receipt, not proof of truth. Serialize scan/resolve for each state file; unchanged prerequisites do not justify repeated expensive checks.
-- `significant` means `run-local-evaluation`, not automatic adoption. Implement only after a representative local comparison shows a meaningful Harness gain and the normal Goal approval boundary permits the change. `evaluate` collects more evidence; `ignore` creates no work.
-- Keep Terra as the default for clear supporting work and Sol for ambiguity, architecture, risk, failed verification, and final synthesis. Use Luna or a higher reasoning mode only when the runtime actually exposes it and representative acceptance/eval evidence justifies the quality, latency, and usage tradeoff.
-- The local classifier and watcher do not schedule themselves or make network calls. After separate user authority, a report-only Scheduled Task may read the fixed official source set and call the watcher; it must not update Codex/Graphify, install plugins, edit source, commit, push, deploy, or adopt a recommendation automatically.
+Only when reviewing OpenAI/Codex updates or operating the update watcher, read [update-radar.md](references/update-radar.md). Ordinary Goal execution does not load this reference.
 
 Do not reconstruct the parent plan on every cycle. Re-read durable state and only the evidence needed for the next wave.
 
@@ -163,6 +160,8 @@ safe_boundary AND (
 ## 9. Complete and archive
 
 Complete the parent Goal only when required subgoals are `done` or accepted as `skipped`, integration checks pass, correctness and simplify reviews pass, and parent acceptance succeeds. Report results, evidence, laziness-ladder decisions, retained exceptions, deviations, risks, and the task chain; wait for user review. Archive registered tasks only after an explicit command such as `Archive Goal chain SEO-001`; archive, never delete.
+
+At meaningful status updates and final handoff, include one short line: tokens (or unavailable with known coverage), recorded failed attempts, and fresh acceptance percentage with numerator/denominator. Run `python harness_metrics.py task --file <metrics.jsonl> --chain <CHAIN> --work-item <acceptance-id>` from the target project root. Missing telemetry/gate means unknown, never zero/100%. A percentage describes the declared acceptance criteria only, not elapsed time or proof of deployment.
 
 ## Stop conditions
 

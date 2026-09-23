@@ -30,6 +30,19 @@ class GoalPassportValidationTests(unittest.TestCase):
     def test_valid_plan_is_accepted(self):
         self.assertEqual([], validate_passport(valid_passport()))
 
+    def test_gpt6_sol_luna_require_callable_effort(self):
+        for model in ('gpt-6-sol', 'gpt-6-luna'):
+            for effort in ('low', 'medium', 'high', 'xhigh', 'max'):
+                with self.subTest(model=model, effort=effort):
+                    passport = valid_passport()
+                    passport['subgoals'][1].update(model=model, reasoningEffort=effort)
+                    self.assertEqual([], validate_passport(passport))
+            for effort in (None, 'none', 'ultra', 'fast'):
+                with self.subTest(model=model, effort=effort):
+                    passport = valid_passport()
+                    passport['subgoals'][1].update(model=model, reasoningEffort=effort)
+                    self.assert_code(passport, 'SUBGOAL_EFFORT')
+
     def test_root_schema_version_requires_exact_integer(self):
         self.assertEqual([], validate_passport(valid_passport()))
         for version in (True, 1.0):
@@ -137,6 +150,19 @@ class GoalPassportValidationTests(unittest.TestCase):
     def test_ready_subgoal_rejects_missing_or_stale_unlock_evidence(self, _):
         passport = valid_passport(); passport["subgoals"][1]["unlockEvidence"] = {"workItem": "hre-002", "criterionId": "acceptance"}
         self.assert_code(passport, "UNLOCK_EVIDENCE")
+
+    def test_changed_manual_definition_closes_real_goal_unlock(self):
+        fingerprint = {"algorithm": "sha256", "value": "fresh", "status": "ok"}
+        criterion = {"id": "review", "kind": "manual", "description": "Review implementation",
+                     "passes": True, "evidence": "Reviewed", "fingerprint": fingerprint}
+        criterion["definitionDigest"] = goal_runner_validator.acceptance_gate.criterion_definition_digest(criterion)
+        passport = valid_passport()
+        passport["subgoals"][1]["unlockEvidence"] = {"workItem": "item", "criterionId": "review"}
+        with patch("goal_runner_validator.acceptance_gate.load", return_value={"criteria": [criterion]}), \
+                patch("goal_runner_validator.acceptance_gate.fingerprint", return_value=fingerprint):
+            self.assertEqual([], validate_passport(passport))
+            criterion["description"] = "Approve release"
+            self.assert_code(passport, "UNLOCK_EVIDENCE")
 
     @patch("goal_runner_validator.acceptance_gate.stored_evidence_is_fresh", return_value=(True, "fresh"))
     def test_evidence_bound_skipped_dependency_requires_reason(self, _):

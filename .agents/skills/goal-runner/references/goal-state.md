@@ -34,7 +34,9 @@ Use one parent work item as the durable source of truth. Keep `.harness/CONTEXT.
 - Executable plan snapshot: `.harness/work/<chain>.passport.json` (owner-maintained, validator-readable)
 - Last validated plan snapshot/hash: run `git hash-object .harness/work/<chain>.passport.json` immediately after a passing validator check
 - Measurement treatment IDs: baseline `<id>` | treatment `<id>` (assigned before measured execution)
-- Metrics path/schema: `.harness/metrics/<chain>.jsonl` / schema 1
+- Metrics path/schema: `.harness/metrics/<chain>.jsonl` / schema 2 (legacy 1 readable)
+- Task report: observed tokens/coverage; failed attempts/coverage; fresh acceptance percent/count
+- Model routing: GPT-6 Luna xhigh scoped implementation; GPT-6 Sol high coordination/judgment; Astra xhigh high-risk/final review; actual runtime availability verified
 - Global agent cap: 12
 - Active agent count: 0
 - Delegation depth cap: 2
@@ -48,7 +50,7 @@ Use one parent work item as the durable source of truth. Keep `.harness/CONTEXT.
 
 | ID | Observable result | Depends on | Wave | Subsystem | Risk | Execution | Model | Status | Acceptance/evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| G01 | | none | 1 | | low | primary/subagent/task | terra/sol | planned | |
+| G01 | | none | 1 | | low | primary/subagent/task | gpt-6-luna / xhigh | planned | |
 
 ## Agent registry
 
@@ -82,3 +84,5 @@ Use one parent work item as the durable source of truth. Keep `.harness/CONTEXT.
 - Before any worker writes and after every plan, authorization, or agent-registry change, update the one executable plan snapshot linked from this work item and run `python goal_runner_validator.py check <snapshot>`.
 - Assign bounded baseline and treatment IDs before a measured run. Record telemetry only at meaningful run or accepted-subgoal checkpoints with `python harness_metrics.py record`; model token counts are observed runtime values or both `null`, never estimates. Keep identifiers bounded and never put transcript or free text into telemetry.
 - Run `python harness_metrics.py compare --file <metrics.jsonl> --baseline <id> --treatment <id>` only when valid pairs exist. Deterministic benchmark results are regression evidence, not a claim of statistically significant or real-world token savings.
+- New subgoals require an explicit model and `reasoningEffort`; preserve legacy Terra/Sol passports until approved revision. Actual fixed agent model must match dispatch intent.
+- Use [task-metrics.md](task-metrics.md) for schema-2 failed attempts and task reporting; unknown historical counts remain unknown. Never calculate progress from model confidence or token volume.

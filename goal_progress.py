@@ -82,18 +82,31 @@ def evidence_fingerprint(unlock: object) -> dict[str, str] | None:
     return {"algorithm": "sha256", "status": "ok", "value": stable_digest(payload)}
 
 
+def passport_repository_root(passport: dict) -> Path:
+    chain = passport.get("chain")
+    configured = chain.get("projectRoot") if isinstance(chain, dict) else None
+    if not isinstance(configured, str) or not configured.strip():
+        raise ProgressError("chain.projectRoot must be a nonempty path")
+    candidate = Path(configured)
+    if not candidate.is_absolute() or not candidate.is_dir():
+        raise ProgressError("chain.projectRoot must be an existing absolute directory")
+    return candidate.resolve()
+
+
 def progress_repository_fingerprint(passport: dict, passport_path: Path) -> dict[str, str]:
     """Ignore only durable attempt state while retaining the rest of the passport."""
-    root = acceptance_gate.root().resolve()
+    root = passport_repository_root(passport)
     try:
         relative = passport_path.resolve().relative_to(root).as_posix()
     except ValueError as exc:
-        raise ProgressError("passport must stay under the acceptance-gate repository root") from exc
+        raise ProgressError("passport must stay under chain.projectRoot") from exc
     semantic_passport = dict(passport)
     semantic_passport.pop(STATE_KEY, None)
     payload = {
         "passport": stable_digest(semantic_passport),
-        "repository": fingerprint(acceptance_gate.fingerprint(ignored_paths={relative})),
+        "repository": fingerprint(acceptance_gate.fingerprint(
+            ignored_paths={relative}, repository_root=root
+        )),
     }
     return {"algorithm": "sha256", "status": "ok", "value": stable_digest(payload)}
 

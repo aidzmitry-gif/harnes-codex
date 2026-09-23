@@ -78,6 +78,9 @@ def _acceptance(case: str, mode: str) -> bool:
         "stale_manual": {"id": "manual", "kind": "manual", "passes": True, "evidence": "reviewed", "fingerprint": {**current, "value": "stale"}},
         "manual_false": {"id": "manual", "kind": "manual", "passes": False, "evidence": "reviewed", "fingerprint": current},
     }
+    for name, item in criteria.items():
+        if name != "legacy_manual":
+            item["definitionDigest"] = acceptance_gate.criterion_definition_digest(item)
     criterion = criteria[case]
     if mode == "baseline":
         return bool(criterion.get("passes"))

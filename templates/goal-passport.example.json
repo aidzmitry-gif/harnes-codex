@@ -22,7 +22,7 @@
     "baselineId": "baseline",
     "treatmentId": "treatment",
     "metricsPath": ".harness/metrics/example-goal.jsonl",
-    "metricsSchemaVersion": 1
+    "metricsSchemaVersion": 2
   },
   "subgoals": [
     {
@@ -31,7 +31,8 @@
       "wave": 1,
       "status": "done",
       "execution": "primary",
-      "model": "terra",
+      "model": "gpt-6-sol",
+      "reasoningEffort": "high",
       "worktree": null,
       "ownedPaths": []
     },
@@ -41,7 +42,8 @@
       "wave": 2,
       "status": "ready",
       "execution": "subagent",
-      "model": "terra",
+      "model": "gpt-6-luna",
+      "reasoningEffort": "xhigh",
       "worktree": "g02",
       "ownedPaths": ["src/example.py"]
     }

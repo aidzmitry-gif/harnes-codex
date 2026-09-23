@@ -18,6 +18,14 @@ AUTH_SCOPES = {"successor creation", "bounded continuation", "both"}
 BOUNDED_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:+/@-]{0,63}$")
 FINGERPRINT = re.compile(r"^[0-9a-f]{64}$")
 MAX_GOAL_PROGRESS_ATTEMPTS = 256
+MODEL_EFFORTS = {
+    'terra': {'low', 'medium', 'high', 'xhigh', 'max'},
+    'sol': {'low', 'medium', 'high', 'xhigh', 'max'},
+    'gpt-5.6-luna': {'low', 'medium', 'high', 'xhigh', 'max'},
+    'gpt-6-luna': {'low', 'medium', 'high', 'xhigh', 'max'},
+    'gpt-6-sol': {'low', 'medium', 'high', 'xhigh', 'max'},
+    'gpt-6-astra': {'low', 'medium', 'high', 'xhigh', 'max', 'ultra'},
+}
 
 
 def enum_member(value: object, choices: set[str]) -> bool:
@@ -174,8 +182,8 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
                 suffix=".jsonl",
             )
         schema = chain.get("metricsSchemaVersion")
-        if isinstance(schema, bool) or schema != 1:
-            fail("CHAIN_CONTINUITY", "chain.metricsSchemaVersion must be integer 1")
+        if isinstance(schema, bool) or not isinstance(schema, int) or schema not in (1, 2):
+            fail("CHAIN_CONTINUITY", "chain.metricsSchemaVersion must be integer 1 or 2")
 
     by_id: dict[str, dict] = {}
     for index, raw in enumerate(subgoals):
@@ -199,8 +207,11 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
             fail("SUBGOAL_STATUS", f"subgoals[{index}].status is invalid")
         if not enum_member(item.get("execution"), {"primary", "subagent", "task"}):
             fail("SUBGOAL_EXECUTION", f"subgoals[{index}].execution is invalid")
-        if not enum_member(item.get("model"), {"terra", "sol"}):
+        model = item.get('model')
+        if not enum_member(model, set(MODEL_EFFORTS)):
             fail("SUBGOAL_MODEL", f"subgoals[{index}].model is invalid")
+        elif ('reasoningEffort' in item or model not in {'terra', 'sol'}) and not enum_member(item.get('reasoningEffort'), MODEL_EFFORTS[model]):
+            fail('SUBGOAL_EFFORT', f'subgoals[{index}].reasoningEffort is required and must match the model')
         if "worktree" not in item or item.get("worktree") is not None and not isinstance(item.get("worktree"), str):
             fail("SUBGOAL_WORKTREE", f"subgoals[{index}].worktree must be string or null")
         elif isinstance(item.get("worktree"), str):

@@ -5,12 +5,15 @@
 ```text
 Chain/subgoal:
 Role and model intent:
+Actual callable model and reasoning effort (confirm fixed-role compatibility):
 Observable outcome:
 Prepared inputs, user action, expected visible result, evidence location:
 Scope and owned paths/worktree:
 Commit authority: none | isolated-worktree checkpoint
 First sufficient laziness-ladder rung:
 Why lower rungs fail:
+Existing implementation search: inspected paths, reuse decision or reason:
+Bugfix root cause and caller coverage: regression check, gaps, or not applicable:
 Explicit exclusions:
 Inputs/startup reads (max 5):
 Dependencies and verified assumptions:
@@ -49,6 +52,7 @@ Changed files:
 Commit hash (only when explicitly authorized):
 Ladder rung, simplifications, retained exceptions, and ponytail triggers:
 Commands/checks and concise results:
+Run ID, actual model/effort, incremental input/output tokens or null, failed attempts or null (no inclusive child totals):
 Unknowns or assumptions:
 Residual risks:
 Confidence: high | medium | low

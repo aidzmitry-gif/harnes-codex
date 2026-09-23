@@ -1,4 +1,6 @@
 import argparse
+import contextlib
+import io
 import unittest
 from pathlib import PurePosixPath
 from unittest.mock import patch
@@ -25,6 +27,7 @@ class AcceptanceGateTests(unittest.TestCase):
         mocked_fingerprint.return_value = before
         criterion = {"id": "manual", "kind": "manual", "passes": True, "evidence": "reviewed"}
         criterion["fingerprint"] = acceptance_gate.fingerprint()
+        criterion["definitionDigest"] = acceptance_gate.criterion_definition_digest(criterion)
         self.assertTrue(acceptance_gate.evaluate(criterion)[0])
         mocked_fingerprint.return_value = after
         self.assertEqual((False, "stale manual evidence: re-prove required"), acceptance_gate.evaluate(criterion))
@@ -38,14 +41,134 @@ class AcceptanceGateTests(unittest.TestCase):
     @patch("acceptance_gate.load")
     @patch("acceptance_gate.subprocess.run")
     def test_stored_command_evidence_is_read_without_execution(self, run, mocked_load, _):
-        mocked_load.return_value = {"criteria": [{"id": "check", "kind": "command", "command": "raise-error", "passes": True, "evidence": "saved", "fingerprint": acceptance_gate.fingerprint()}]}
+        criterion = self.command("raise-error", id="check", passes=True, evidence="saved", fingerprint=acceptance_gate.fingerprint())
+        criterion["definitionDigest"] = acceptance_gate.command_definition_digest(criterion)
+        mocked_load.return_value = {"criteria": [criterion]}
         self.assertEqual((True, "fresh stored acceptance evidence"), acceptance_gate.stored_evidence_is_fresh("item", "check"))
         run.assert_not_called()
 
     @patch("acceptance_gate.fingerprint", return_value={"algorithm": "sha256", "value": "fresh", "status": "ok"})
     @patch("acceptance_gate.load")
+    def test_stored_command_evidence_rejects_changed_definition(self, mocked_load, _):
+        criterion = self.command("new-command", id="check", passes=True, evidence="saved", fingerprint=acceptance_gate.fingerprint())
+        criterion["definitionDigest"] = acceptance_gate.command_definition_digest(self.command("old-command"))
+        mocked_load.return_value = {"criteria": [criterion]}
+        self.assertEqual(
+            (False, "stale command definition: reverify required"),
+            acceptance_gate.stored_evidence_is_fresh("item", "check"),
+        )
+
+    def test_definition_digest_binds_every_command_oracle_field(self):
+        criterion = self.command("python check.py", description="Run check", timeoutSeconds=20, cwd="tests", expect="PASS CHECK")
+        baseline = acceptance_gate.command_definition_digest(criterion)
+        for field, value in (("id", "other"), ("kind", "manual"), ("description", "Different check"),
+                             ("command", "python other.py"), ("timeoutSeconds", 21),
+                             ("cwd", "scripts"), ("expect", "FAIL")):
+            with self.subTest(field=field):
+                self.assertNotEqual(baseline, acceptance_gate.command_definition_digest({**criterion, field: value}))
+
+    @patch("acceptance_gate.fingerprint", return_value={"algorithm": "sha256", "value": "fresh", "status": "ok"})
+    @patch("acceptance_gate.load")
+    def test_manual_definition_and_kind_changes_revoke_stored_evidence(self, mocked_load, _):
+        current = acceptance_gate.fingerprint()
+        manual = {"id": "review", "kind": "manual", "description": "Review implementation",
+                  "passes": True, "evidence": "Reviewed", "fingerprint": current}
+        manual["definitionDigest"] = acceptance_gate.criterion_definition_digest(manual)
+        mocked_load.return_value = {"criteria": [manual]}
+        self.assertTrue(acceptance_gate.stored_evidence_is_fresh("item", "review")[0])
+        manual["description"] = "Approve release"
+        self.assertEqual((False, "stale manual definition: re-prove required"),
+                         acceptance_gate.stored_evidence_is_fresh("item", "review"))
+        self.assertFalse(acceptance_gate.evaluate(manual)[0])
+        manual.pop("definitionDigest")
+        self.assertFalse(acceptance_gate.stored_evidence_is_fresh("item", "review")[0])
+
+        command = self.command("python check.py", id="check", passes=True, evidence="auto: exit 0", fingerprint=current)
+        command["definitionDigest"] = acceptance_gate.command_definition_digest(command)
+        command["kind"] = "manual"
+        mocked_load.return_value = {"criteria": [command]}
+        self.assertFalse(acceptance_gate.stored_evidence_is_fresh("item", "check")[0])
+
+    def test_cwd_and_expect_are_validated(self):
+        for cwd in ("", "../outside", "tests/../../outside", "C:/outside", "tests\\nested", "/outside"):
+            with self.subTest(cwd=cwd), self.assertRaises(ValueError):
+                acceptance_gate.validate({"criteria": [self.command("echo ok", cwd=cwd)]})
+        for expect in ("", " \t", "x" * 1025):
+            with self.subTest(expect=expect[:12]), self.assertRaises(ValueError):
+                acceptance_gate.validate({"criteria": [self.command("echo ok", expect=expect)]})
+
+    @patch("acceptance_gate.fingerprint", return_value={"algorithm": "sha256", "value": "fresh", "status": "ok"})
+    @patch("acceptance_gate.subprocess.run")
+    def test_command_requires_zero_exit_and_expected_marker(self, run, _):
+        run.return_value = type("Result", (), {"returncode": 0, "stdout": "finished", "stderr": ""})()
+        criterion = self.command("python check.py", expect="PASS CHECK")
+        passed, evidence = acceptance_gate.evaluate(criterion)
+        self.assertFalse(passed)
+        self.assertIn("expected marker missing", evidence)
+        self.assertEqual(acceptance_gate.command_definition_digest(criterion), criterion["definitionDigest"])
+
+        run.return_value = type("Result", (), {"returncode": 0, "stdout": "PASS CHECK", "stderr": ""})()
+        passed, evidence = acceptance_gate.evaluate(criterion)
+        self.assertTrue(passed)
+        self.assertIn("expected marker matched", evidence)
+
+        run.return_value = type("Result", (), {"returncode": 1, "stdout": "PASS CHECK", "stderr": ""})()
+        passed, _ = acceptance_gate.evaluate(criterion)
+        self.assertFalse(passed)
+
+    @patch("acceptance_gate.fingerprint", return_value={"algorithm": "sha256", "value": "", "status": "unavailable"})
+    @patch("acceptance_gate.subprocess.run")
+    def test_unavailable_fingerprint_cannot_report_command_pass(self, run, _):
+        passed, evidence = acceptance_gate.evaluate(self.command("python check.py"))
+        self.assertFalse(passed)
+        self.assertIn("fingerprint unavailable", evidence)
+        run.assert_not_called()
+
+    @patch("acceptance_gate.fingerprint", return_value={"algorithm": "sha256", "value": "fresh", "status": "ok"})
+    @patch("acceptance_gate.subprocess.run")
+    def test_command_uses_declared_repository_cwd(self, run, _):
+        run.return_value = type("Result", (), {"returncode": 0, "stdout": "OK", "stderr": ""})()
+        passed, _ = acceptance_gate.evaluate(self.command("python check.py", cwd="tests", expect="OK"))
+        self.assertTrue(passed)
+        self.assertEqual((acceptance_gate.root() / "tests").resolve(), run.call_args.kwargs["cwd"])
+
+    @patch("acceptance_gate.fingerprint", return_value={"algorithm": "sha256", "value": "fresh", "status": "ok"})
+    @patch("acceptance_gate.subprocess.run", side_effect=AssertionError("status must not execute checks"))
+    def test_status_is_read_only_and_detects_changed_definition(self, run, _):
+        criterion = self.command("old-command", id="check", passes=True, evidence="saved success", fingerprint=acceptance_gate.fingerprint())
+        criterion["definitionDigest"] = acceptance_gate.command_definition_digest(criterion)
+        data = {"criteria": [criterion]}
+        target = acceptance_gate.root() / ".harness" / "acceptance" / "item.json"
+        with patch("acceptance_gate.gate_path", return_value=target), patch("acceptance_gate.load", return_value=data), \
+                patch("pathlib.Path.exists", return_value=True), patch("acceptance_gate.save") as save, \
+                patch("pathlib.Path.write_text") as write_text:
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                result = acceptance_gate.status(argparse.Namespace(work_item="item"))
+            self.assertEqual(0, result)
+            self.assertIn("PASS check: fresh stored acceptance evidence", output.getvalue())
+
+            criterion["command"] = "new-command"
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                result = acceptance_gate.status(argparse.Namespace(work_item="item"))
+            self.assertEqual(2, result)
+            self.assertIn("stale command definition", output.getvalue())
+        save.assert_not_called()
+        write_text.assert_not_called()
+        run.assert_not_called()
+
+    def test_reverify_cli_routes_to_full_check(self):
+        with patch("sys.argv", ["acceptance_gate.py", "reverify", "item"]), patch("acceptance_gate.check", return_value=0) as check:
+            self.assertEqual(0, acceptance_gate.main())
+            check.assert_called_once()
+
+    @patch("acceptance_gate.fingerprint", return_value={"algorithm": "sha256", "value": "fresh", "status": "ok"})
+    @patch("acceptance_gate.load")
     def test_stored_evidence_missing_or_stale_fails_closed(self, mocked_load, _):
-        mocked_load.return_value = {"criteria": [{"id": "check", "kind": "manual", "passes": True, "evidence": "", "fingerprint": acceptance_gate.fingerprint()}]}
+        criterion = {"id": "check", "kind": "manual", "passes": True, "evidence": "", "fingerprint": acceptance_gate.fingerprint()}
+        criterion["definitionDigest"] = acceptance_gate.criterion_definition_digest(criterion)
+        mocked_load.return_value = {"criteria": [criterion]}
         self.assertEqual((False, "missing stored acceptance evidence"), acceptance_gate.stored_evidence_is_fresh("item", "check"))
         mocked_load.return_value["criteria"][0].update({"evidence": "saved", "fingerprint": {"algorithm": "sha256", "value": "old", "status": "ok"}})
         self.assertEqual((False, "stale stored acceptance evidence"), acceptance_gate.stored_evidence_is_fresh("item", "check"))
@@ -76,8 +199,22 @@ class AcceptanceGateTests(unittest.TestCase):
         self.assertEqual(0, criterion["durationMs"])
         self.assertIn("checkedAt", criterion)
         self.assertEqual("fresh", criterion["fingerprint"]["value"])
+        self.assertEqual(acceptance_gate.criterion_definition_digest(criterion), criterion["definitionDigest"])
         self.assertTrue(acceptance_gate.evaluate(criterion)[0])
         mocked_save.assert_called_once()
+
+    @patch("acceptance_gate.save")
+    @patch("acceptance_gate.fingerprint", return_value={"algorithm": "sha256", "value": "", "status": "unavailable"})
+    @patch("acceptance_gate.load")
+    @patch("acceptance_gate.gate_path")
+    def test_prove_rejects_unavailable_fingerprint_without_write(self, mocked_path, mocked_load, _, mocked_save):
+        mocked_path.return_value = acceptance_gate.root() / "gate.json"
+        mocked_load.return_value = {"criteria": [{"id": "review", "kind": "manual", "passes": False, "evidence": ""}]}
+        with patch("pathlib.Path.exists", return_value=True):
+            result = acceptance_gate.prove(argparse.Namespace(work_item="item", criterion="review", evidence="reviewed"))
+        self.assertEqual(2, result)
+        self.assertFalse(mocked_load.return_value["criteria"][0]["passes"])
+        mocked_save.assert_not_called()
 
     def test_command_records_timestamp_duration_and_failure(self):
         criterion = self.command("python -c \"raise SystemExit(3)\"")
@@ -87,6 +224,7 @@ class AcceptanceGateTests(unittest.TestCase):
         self.assertIsInstance(criterion["durationMs"], int)
         self.assertGreaterEqual(criterion["durationMs"], 0)
         self.assertIn("fingerprint", criterion)
+        self.assertEqual(acceptance_gate.command_definition_digest(criterion), criterion["definitionDigest"])
 
     def test_command_timeout_is_recorded_failure(self):
         criterion = self.command("python -c \"import time; time.sleep(2)\"", timeoutSeconds=1)

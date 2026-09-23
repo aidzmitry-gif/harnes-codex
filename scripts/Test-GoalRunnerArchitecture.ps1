@@ -28,11 +28,16 @@ $pythonCheck = @'
 import json, sys, tomllib
 from pathlib import Path
 root = Path(sys.argv[1])
+sys.path.insert(0, str(root))
+from tests.test_laziness_ladder import read_contract, validate_contract
+ladder_errors = validate_contract(read_contract(root))
+assert not ladder_errors, ladder_errors
 cfg = tomllib.loads((root / '.codex/config.toml').read_text(encoding='utf-8'))
 agents = cfg.get('agents', {})
 assert agents.get('enabled') is True
 assert agents.get('max_concurrent_threads_per_session') == 12
-assert agents.get('default_subagent_model') == 'gpt-5.6-terra'
+assert agents.get('default_subagent_model') == 'gpt-6-luna'
+assert agents.get('default_subagent_reasoning_effort') == 'xhigh'
 roles = {}
 for path in sorted((root / '.codex/agents').glob('harness-goal-*.toml')):
     data = tomllib.loads(path.read_text(encoding='utf-8'))
@@ -46,16 +51,25 @@ assert roles['harness_goal_explorer']['sandbox_mode'] == 'read-only'
 assert roles['harness_goal_verifier']['sandbox_mode'] == 'read-only'
 assert roles['harness_goal_lead']['sandbox_mode'] == 'read-only'
 assert roles['harness_goal_worker']['sandbox_mode'] == 'workspace-write'
+for role, model, effort in (
+    ('worker', 'gpt-6-luna', 'xhigh'),
+    ('explorer', 'gpt-6-luna', 'xhigh'),
+    ('lead', 'gpt-6-sol', 'high'),
+    ('verifier', 'gpt-6-astra', 'xhigh'),
+):
+    actual = roles['harness_goal_' + role]
+    assert (actual['model'], actual['model_reasoning_effort']) == (model, effort)
 fixture = tomllib.loads((root / 'templates/codex.config.fixture.toml').read_text(encoding='utf-8'))
 assert fixture.get('features', {}).get('goals') is True
 criteria = json.loads((root / 'templates/acceptance.goal-runner.json').read_text(encoding='utf-8'))['criteria']
 assert [item['id'] for item in criteria] == ['runtime-tests', 'plan-passport', 'benchmark', 'architecture', 'installer', 'review']
 passport = json.loads((root / 'templates/goal-passport.example.json').read_text(encoding='utf-8'))
+assert {(item['model'], item['reasoningEffort']) for item in passport['subgoals']} == {('gpt-6-sol', 'high'), ('gpt-6-luna', 'xhigh')}
 continuity = passport['chain']
 assert all(key in continuity for key in ('canonicalWorkItemPath', 'baselineId', 'treatmentId', 'metricsPath', 'metricsSchemaVersion'))
 assert all(isinstance(continuity[key], str) and continuity[key] for key in ('canonicalWorkItemPath', 'baselineId', 'treatmentId', 'metricsPath'))
 assert continuity['baselineId'] != continuity['treatmentId']
-assert continuity['metricsSchemaVersion'] == 1 and isinstance(continuity['metricsSchemaVersion'], int) and not isinstance(continuity['metricsSchemaVersion'], bool)
+assert continuity['metricsSchemaVersion'] in (1, 2) and isinstance(continuity['metricsSchemaVersion'], int) and not isinstance(continuity['metricsSchemaVersion'], bool)
 benchmark = json.loads((root / 'tests/fixtures/hre-001-benchmark.json').read_text(encoding='utf-8'))
 assert benchmark.get('schemaVersion') == 1 and isinstance(benchmark.get('scenarios'), list) and len(benchmark['scenarios']) >= 20
 print(json.dumps({'cap': agents['max_concurrent_threads_per_session'], 'roles': sorted(roles)}))
@@ -128,14 +142,22 @@ $requiredSkillPatterns = @(
     'one native Goal in the primary task',
     'goal_orchestrator.py plan',
     'Update impact radar',
-    'update_impact.py classify',
-    'update_radar.py scan',
-    'run-local-evaluation',
-    'API-only feature',
-    'Use Luna'
+    'gpt-5.6-luna',
+    'gpt-6-luna',
+    'gpt-6-sol',
+    'gpt-6-astra',
+    'task-metrics.md',
+    'switching models alone does not unlock a retry'
 )
 foreach ($pattern in $requiredSkillPatterns) {
     if (-not $skillText.Contains($pattern)) { throw "Goal Runner contract missing: $pattern" }
+}
+# Conditional instructions remain validated even when the entrypoint does not load them.
+$radarReference = Join-Path $root '.agents\skills\goal-runner\references\update-radar.md'
+if (-not $skillText.Contains('(references/update-radar.md)')) { throw 'Missing radar routing link.' }
+$radarReferenceText = Get-Content -LiteralPath $radarReference -Raw -Encoding UTF8
+foreach ($pattern in @('update_impact.py classify', 'update_radar.py scan', 'run-local-evaluation', 'API-only feature', 'not automatic adoption', 'must not update Codex/Graphify', 'Preserve the explicitly approved routing')) {
+    if (-not $radarReferenceText.Contains($pattern)) { throw "Radar reference contract missing: $pattern" }
 }
 if ($skillText.Contains('TODO')) { throw 'Goal Runner skill still contains TODO.' }
 
@@ -176,6 +198,7 @@ foreach ($pattern in $requiredStatePatterns) {
 
 $requiredLadderPatterns = @(
     'Do nothing (YAGNI)',
+    'Existing codebase implementation',
     'Standard library or language feature',
     'Native platform primitive',
     'Existing project dependency',
@@ -192,7 +215,7 @@ foreach ($pattern in $requiredLadderPatterns) {
 
 $workerText = Get-Content -LiteralPath (Join-Path $root '.codex\agents\harness-goal-worker.toml') -Raw
 $verifierText = Get-Content -LiteralPath (Join-Path $root '.codex\agents\harness-goal-verifier.toml') -Raw
-foreach ($pattern in @('YAGNI', 'native platform', 'ponytail triggers')) {
+foreach ($pattern in @('references/laziness-ladder.md', 'first sufficient rung', 'ponytail triggers')) {
     if (-not $workerText.Contains($pattern)) { throw "Worker laziness-ladder contract missing: $pattern" }
 }
 foreach ($pattern in @('two ordered passes', 'correctness', 'laziness ladder', 'safety floor')) {

@@ -13,6 +13,27 @@ from tests.test_goal_runner_validator import valid_passport
 
 
 class GoalOrchestratorTests(unittest.TestCase):
+    def test_new_model_and_effort_survive_dispatch_plan(self):
+        for model, effort in (('gpt-5.6-luna', 'xhigh'), ('gpt-6-astra', 'high'), ('gpt-6-luna', 'xhigh'), ('gpt-6-sol', 'high')):
+            passport = self.passport()
+            passport['subgoals'][1].update(model=model, reasoningEffort=effort)
+            action = plan_actions(passport, 'running')['actions'][0]
+            self.assertEqual(action['model'], model)
+            self.assertEqual(action['reasoningEffort'], effort)
+
+    def test_new_model_requires_valid_effort_and_does_not_relax_authority(self):
+        for effort in (None, 'none', 'fast', [], True):
+            passport = self.passport()
+            passport['subgoals'][1].update(model='gpt-6-astra', reasoningEffort=effort)
+            with self.subTest(effort=effort), self.assertRaises(ValueError):
+                plan_actions(passport, 'running')
+        passport = self.passport()
+        passport['subgoals'][1].update(model='gpt-5.6-luna', reasoningEffort='xhigh')
+        self.assertNotIn('launch', [a['action'] for a in plan_actions(passport, 'paused')['actions']])
+        passport['chain']['standingChainAuthorization'] = 'absent'
+        with self.assertRaisesRegex(ValueError, 'CHAIN_AUTH'):
+            plan_actions(passport, 'running')
+
     def passport(self):
         passport = valid_passport()
         passport["agents"] = []

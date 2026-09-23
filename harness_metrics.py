@@ -16,15 +16,18 @@ from typing import Any
 
 
 SCHEMA_VERSION = 1
+# Version 2 adds explicit failed attempts. Keep old producers and rows readable.
+FAILURE_SCHEMA_VERSION = 2
 # ponytail: measured at 50,000 pair keys (1.763 s / 54.06 MiB); above this archive JSONL or add a SQLite index.
 MAX_COMPARE_PAIR_KEYS = 50_000
 EVENT_FIELDS = (
     "runId", "pairKey", "chainId", "subgoalId", "treatment", "mode", "model",
     "reasoningEffort", "inputTokens", "outputTokens", "durationMs", "attempts",
     "reworkCount", "accepted", "released", "used", "escapedDefects", "checksPassed",
-    "checksFailed",
+    "checksFailed", "failedAttempts",
 )
 RECORD_FIELDS = ("schemaVersion", "recordedAt", *EVENT_FIELDS)
+LEGACY_RECORD_FIELDS = set(RECORD_FIELDS) - {"failedAttempts"}
 REQUIRED_FIELDS = {
     "runId", "pairKey", "treatment", "mode", "durationMs", "attempts", "reworkCount",
     "accepted", "escapedDefects", "checksPassed", "checksFailed",
@@ -34,7 +37,7 @@ TEXT_FIELDS = {
 }
 COUNT_FIELDS = {
     "inputTokens", "outputTokens", "durationMs", "attempts", "reworkCount", "escapedDefects",
-    "checksPassed", "checksFailed",
+    "checksPassed", "checksFailed", "failedAttempts",
 }
 BOOL_FIELDS = {"accepted", "released", "used"}
 IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/+-]{0,255}$")
@@ -67,7 +70,7 @@ def validate_event(event: Any) -> dict[str, Any]:
             _fail(f"{field} contains a secret-like value")
     for field in COUNT_FIELDS:
         value = normalized[field]
-        if field in ("inputTokens", "outputTokens") and value is None:
+        if field in ("inputTokens", "outputTokens", "failedAttempts") and value is None:
             continue
         if isinstance(value, bool) or not isinstance(value, int) or value < 0:
             _fail(f"{field} must be a nonnegative integer")
@@ -75,6 +78,8 @@ def validate_event(event: Any) -> dict[str, Any]:
         _fail("inputTokens and outputTokens must both be nonnegative integers or both null")
     if normalized["attempts"] < 1:
         _fail("attempts must be at least 1")
+    if normalized['failedAttempts'] is not None and normalized['failedAttempts'] > normalized['attempts']:
+        _fail('failedAttempts must not exceed attempts')
     for field in BOOL_FIELDS:
         value = normalized[field]
         if field in ("released", "used") and value is None:
@@ -88,15 +93,22 @@ def validate_event(event: Any) -> dict[str, Any]:
 
 def normalize_event(event: Any, recorded_at: str | None = None) -> dict[str, Any]:
     normalized = validate_event(event)
+    version = FAILURE_SCHEMA_VERSION if 'failedAttempts' in event else SCHEMA_VERSION
+    if version == SCHEMA_VERSION:
+        normalized.pop('failedAttempts')
     timestamp = recorded_at or datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-    return {"schemaVersion": SCHEMA_VERSION, "recordedAt": timestamp, **normalized}
+    return {"schemaVersion": version, "recordedAt": timestamp, **normalized}
 
 
 def validate_record(record: Any) -> dict[str, Any]:
-    if not isinstance(record, dict) or set(record) != set(RECORD_FIELDS):
+    if not isinstance(record, dict):
         _fail("record has an invalid schema")
-    if record["schemaVersion"] != SCHEMA_VERSION:
+    version = record.get('schemaVersion')
+    if isinstance(version, bool) or not isinstance(version, int) or version not in (SCHEMA_VERSION, FAILURE_SCHEMA_VERSION):
         _fail("unsupported schemaVersion")
+    expected = LEGACY_RECORD_FIELDS if version == SCHEMA_VERSION else set(RECORD_FIELDS)
+    if set(record) != expected:
+        _fail('record has an invalid schema')
     timestamp = record["recordedAt"]
     if not isinstance(timestamp, str):
         _fail("recordedAt must be a UTC timestamp")
@@ -106,7 +118,7 @@ def validate_record(record: Any) -> dict[str, Any]:
         raise ValueError("recordedAt must be a UTC timestamp") from exc
     if parsed.tzinfo is None or parsed.utcoffset() != UTC.utcoffset(parsed):
         _fail("recordedAt must be UTC")
-    normalize_event({field: record[field] for field in EVENT_FIELDS}, recorded_at=timestamp)
+    validate_event({field: record[field] for field in EVENT_FIELDS if field in record})
     return record
 
 
@@ -146,6 +158,61 @@ def iter_records(path: Path) -> Iterator[dict[str, Any]]:
 def load_records(path: Path) -> list[dict[str, Any]]:
     """Compatibility helper for callers that explicitly need a materialized list."""
     return list(iter_records(path))
+
+
+def task_summary(records: Iterable[dict[str, Any]], chain_id: str) -> dict[str, Any]:
+    """Count non-overlapping run deltas for one task, never guess missing usage."""
+    if not isinstance(chain_id, str) or not IDENTIFIER_PATTERN.fullmatch(chain_id):
+        _fail('chain must be a bounded identifier')
+    seen: set[str] = set()
+    tokens = failures = known_tokens = known_failures = attempts = 0
+    for record in records:
+        validate_record(record)
+        if record['chainId'] != chain_id:
+            continue
+        if record['runId'] in seen:
+            _fail('duplicate runId in task telemetry')
+        if len(seen) >= MAX_COMPARE_PAIR_KEYS:
+            _fail('task telemetry exceeds bounded run limit; archive completed runs')
+        seen.add(record['runId'])
+        attempts += record['attempts']
+        if record['inputTokens'] is not None:
+            tokens += record['inputTokens'] + record['outputTokens']
+            known_tokens += 1
+        if record.get('failedAttempts') is not None:
+            failures += record['failedAttempts']
+            known_failures += 1
+    runs = len(seen)
+
+    def coverage(subtotal: int, known: int) -> dict[str, Any]:
+        return {'total': subtotal if runs and known == runs else None,
+                'knownSubtotal': subtotal if known else None, 'knownRuns': known,
+                'knownCoverage': known / runs if runs else None}
+
+    return {'chainId': chain_id, 'runs': runs, 'attempts': attempts,
+            'scope': 'recorded-run-deltas-only',
+            'tokens': coverage(tokens, known_tokens),
+            'failedAttempts': coverage(failures, known_failures)}
+
+
+def acceptance_progress(work_item: str) -> dict[str, Any]:
+    """Read the existing gate, without executing any criterion or trusting status."""
+    import acceptance_gate
+
+    try:
+        data = acceptance_gate.load(acceptance_gate.gate_path(work_item))
+        if not isinstance(data, dict):
+            raise ValueError('acceptance gate must be an object')
+        criteria = acceptance_gate.validate(data)
+        current = acceptance_gate.fingerprint()
+    except (OSError, ValueError):
+        return {'workItem': work_item, 'percent': None, 'verified': None,
+                'total': None, 'basis': 'acceptance-unavailable'}
+    verified = sum(acceptance_gate.evidence_freshness(criterion, current)[0] for criterion in criteria)
+    total = len(criteria)
+    percent = 100.0 if verified == total else min(99.99, round(100 * verified / total, 2))
+    return {'workItem': work_item, 'percent': percent,
+            'verified': verified, 'total': total, 'basis': 'fresh-acceptance-criteria'}
 
 
 def summary(records: Iterable[dict[str, Any]]) -> dict[str, Any]:
@@ -261,6 +328,10 @@ def main() -> int:
     record.add_argument("--from", dest="event_file", required=True, type=Path)
     summary_command = commands.add_parser("summary")
     summary_command.add_argument("--file", required=True, type=Path)
+    task = commands.add_parser('task')
+    task.add_argument('--file', required=True, type=Path)
+    task.add_argument('--chain', required=True)
+    task.add_argument('--work-item', required=True)
     compare_command = commands.add_parser("compare")
     compare_command.add_argument("--file", required=True, type=Path)
     compare_command.add_argument("--baseline", required=True)
@@ -274,6 +345,12 @@ def main() -> int:
             _dump(normalized)
         elif args.command == "summary":
             _dump(summary(iter_records(args.file)))
+        elif args.command == 'task':
+            available = args.file.exists()
+            result = task_summary(iter_records(args.file) if available else [], args.chain)
+            result['telemetryStatus'] = 'available' if available else 'unavailable'
+            result['progress'] = acceptance_progress(args.work_item)
+            _dump(result)
         else:
             _dump(compare(iter_records(args.file), args.baseline, args.treatment))
     except (OSError, json.JSONDecodeError, ValueError) as exc:

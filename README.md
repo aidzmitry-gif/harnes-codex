@@ -58,7 +58,34 @@ git hash-object .harness\work\<chain>.passport.json
 ```powershell
 python .\harness_metrics.py record --file .harness\metrics\<chain>.jsonl --from .harness\work\<event>.json
 python .\harness_metrics.py compare --file .harness\metrics\<chain>.jsonl --baseline baseline --treatment treatment
+python .\harness_metrics.py task --file .harness\metrics\<chain>.jsonl --chain <CHAIN> --work-item <id>
 ```
+
+В отчёт задачи входят токены, неудачные попытки и процент свежих критериев приёмки.
+`failedAttempts` включает schema 2; старые события schema 1 остаются читаемыми.
+Токены/неудачи без полного покрытия — `null` плюс известная часть; дубликат runId
+отклоняется. Процент — свежие PASS / все критерии по той же проверке, что используют
+`status` и Goal unlock. `task` не запускает acceptance-критерии; отсутствующий журнал
+или acceptance дают «нет данных».
+Используйте CLI, установленный в измеряемом проекте: gate и fingerprint привязаны
+к каталогу `acceptance_gate.py`, а не к произвольному cwd.
+
+Исходный профиль моделей для новых задач: **GPT-6 Luna xhigh** — ограниченная
+реализация, тесты и ясный поиск (сохранён прежний effort при миграции);
+**GPT-6 Sol high** — координация и кодинг, требующий суждения; **GPT-6 Astra
+xhigh** — неоднозначные контракты и итоговая проверка высокого риска. Для простой
+низкорисковой задачи можно согласовать Luna low/medium с адресным оракулом, а
+затем сравнить свежую приёмку и фактический расход на одинаковых входах. Это
+гипотеза маршрутизации, не доказанная экономия. План содержит точные `model`
+и `reasoningEffort`, проверяет их и передаёт в `launch`; старые Terra/Sol/Luna 5.6
+паспорта сохраняются. В этом интерфейсе Goal допускает для Sol/Luna `low…max`:
+API-поддержка `none` не означает её доступность через Codex-делегирование.
+Проверяйте доступность конкретной модели и фиксированную модель установленной
+роли до запуска: правка исходников не переключает уже запущенного агента и не
+устанавливает профиль глобально или в других проектах.
+Основание специализации моделей: [выбор модели OpenAI](https://developers.openai.com/api/docs/guides/model-selection),
+[Sol](https://developers.openai.com/api/docs/models/gpt-6-sol) и
+[Luna](https://developers.openai.com/api/docs/models/gpt-6-luna); конкретный Codex runtime проверяется отдельно.
 
 Для повторной попытки одной подцели проверьте, что появилось наблюдаемое изменение. `goal_progress.py` хранит только ограниченную сигнатуру: ID цепочки/подцели/стратегии, fingerprint репозитория и структурированный fingerprint evidence. Одинаковая сигнатура завершится с `NO_PROGRESS`; новый текст в поле evidence не является новым прогрессом.
 
@@ -95,7 +122,7 @@ python .\goal_orchestrator.py plan .harness\work\<chain>.passport.json --parent-
 python .\update_impact.py classify .\my-update-candidate.json
 ```
 
-Классификатор работает offline, разрешает только официальные OpenAI documentation hosts и не исполняет текст источника. `significant` означает `run-local-evaluation`, а не автоматическое внедрение; `evaluate` требует дополнительных доказательств; `ignore` не создаёт работу. API-only возможность не считается доступной в локальном Codex без отдельной проверки. Terra остаётся базовым выбором для ясной вспомогательной работы, Sol — для неоднозначности, риска и финальной проверки; Luna/повышенное усилие используются только когда runtime их действительно предоставляет и representative eval показывает выигрыш.
+Классификатор работает offline, разрешает только официальные OpenAI documentation hosts и не исполняет текст источника. `significant` означает `run-local-evaluation`, а не автоматическое внедрение; `evaluate` требует дополнительных доказательств; `ignore` не создаёт работу. API-only возможность не считается доступной в локальном Codex без отдельной проверки. Радар не меняет одобренный профиль Luna/Astra автоматически; representative eval нужен до утверждений о выигрыше качества/скорости/расхода, а не для переопределения явно выбранной пользователем модели.
 
 ### Автономный наблюдатель обновлений
 
@@ -131,7 +158,7 @@ Installer транзакционно обновляет глобальный con
 
 В git-проектах Goal Runner использует проверенные атомарные checkpoints: один commit после приёмки подцели, с chain/subgoal ID и сохранённым хешем в work item. Интеграцию коммитит основной оркестратор; worker получает право на commit только в отдельном чистом worktree. Автоматического push и широкого staging нет. Git-история дополняет, но не заменяет журнал решений и проверок.
 
-При выполнении и code review действует лестница лени: YAGNI → stdlib/язык → нативный примитив платформы → существующая зависимость → одна строка → минимальный работающий код. Ревью всегда двухпроходное: correctness/security сначала, simplify/reuse/delete затем. Лестница не разрешает упрощать границы доверия, данные, деньги, безопасность, доступность, транзакции и явно запрошенное поведение.
+При выполнении и code review действует [каноническая лестница](.agents/skills/goal-runner/references/laziness-ladder.md): сначала проверить возможность переиспользования, а для bugfix — первопричину и потребителей изменяемого контракта. Ревью всегда двухпроходное: correctness/security сначала, simplify/reuse/delete затем. Лестница не разрешает упрощать границы доверия, данные, деньги, безопасность, доступность, транзакции и явно запрошенное поведение.
 
 ## Что проверяет gate
 
@@ -159,7 +186,18 @@ Graphify работает локально: код проекта не отпр�
 python .\acceptance_gate.py init <work-item> --from .\my-acceptance.json
 python .\acceptance_gate.py prove <work-item> review --evidence "Reviewed git diff."
 python .\acceptance_gate.py check <work-item>
+python .\acceptance_gate.py status <work-item>
+python .\acceptance_gate.py reverify <work-item>
 ```
+
+`status` только читает ledger и freshness: он не исполняет acceptance-критерии и не меняет ledger.
+`check` и `reverify` исполняют все command criteria; для критерия можно объявить
+`cwd` внутри корня проекта и `expect` с точной строкой успешного вывода. SHA-256
+привязывает evidence к ID, типу, описанию критерия и параметрам команды. Изменение
+определения делает PASS устаревшим. Старое command evidence требует `reverify`,
+старое manual evidence — нового `prove`; это явно покажут `status` и отчёт задачи.
+Если fingerprint проекта недоступен, `check` не запускает команду и не сообщает PASS,
+а `prove` не записывает ручной PASS.
 
 Подробный безопасный порядок подключения — в [docs/ADOPTION.md](docs/ADOPTION.md).
 

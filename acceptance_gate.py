@@ -16,7 +16,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from fnmatch import fnmatch
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 
 SENSITIVE_DIRECTORIES = {".ssh", "credential", "credentials", "secret", "secrets"}
@@ -66,8 +66,62 @@ def validate(data: dict) -> list[dict]:
         timeout = criterion.get("timeoutSeconds", 600)
         if kind == "command" and (not isinstance(timeout, int) or isinstance(timeout, bool) or not 1 <= timeout <= 600):
             raise ValueError(f"{cid}: timeoutSeconds must be an integer from 1 to 600")
+        if kind == "command" and "expect" in criterion:
+            expect = criterion["expect"]
+            if not isinstance(expect, str) or not expect.strip() or len(expect.encode("utf-8")) > 1024:
+                raise ValueError(f"{cid}: expect must be a non-empty literal marker no larger than 1024 UTF-8 bytes")
+        if kind == "command" and "cwd" in criterion:
+            validate_cwd(criterion["cwd"])
         seen.add(cid)
     return criteria
+
+
+def validate_cwd(value: object) -> str:
+    """Accept only normalized repository-relative working directories."""
+    if not isinstance(value, str) or not value or "\\" in value or "\0" in value:
+        raise ValueError("cwd must be a non-empty repository-relative POSIX path")
+    if value == ".":
+        return value
+    windows_path = PureWindowsPath(value)
+    parts = value.split("/")
+    if windows_path.drive or windows_path.root or any(part in {"", ".", ".."} for part in parts):
+        raise ValueError("cwd must stay within the repository and use normalized path segments")
+    return value
+
+
+def resolve_cwd(value: object = None) -> Path:
+    """Resolve a declared cwd and refuse paths outside the repository root."""
+    base = root().resolve()
+    relative = "." if value is None else validate_cwd(value)
+    candidate = base if relative == "." else base.joinpath(*PurePosixPath(relative).parts)
+    resolved = candidate.resolve(strict=True)
+    if not resolved.is_dir() or not resolved.is_relative_to(base):
+        raise ValueError("cwd must resolve to a directory inside the repository")
+    return resolved
+
+
+def criterion_definition_digest(criterion: dict) -> str:
+    """Bind evidence to the meaning and identity of either criterion kind."""
+    definition = {
+        "version": 2,
+        "id": criterion["id"],
+        "kind": criterion["kind"],
+        "description": criterion.get("description"),
+    }
+    if criterion["kind"] == "command":
+        definition.update({
+            "command": criterion["command"],
+            "timeoutSeconds": criterion.get("timeoutSeconds", 600),
+            "cwd": criterion.get("cwd"),
+            "expect": criterion.get("expect"),
+        })
+    canonical = json.dumps(definition, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def command_definition_digest(criterion: dict) -> str:
+    """Retain the command helper used by existing callers and tests."""
+    return criterion_definition_digest(criterion)
 
 
 def now_utc() -> str:
@@ -131,28 +185,38 @@ def digest_files(base: Path, names: list[str], ignored: frozenset[str] = frozens
     return digest.hexdigest()
 
 
-def git_output(*args: str) -> str:
+def git_output(*args: str, cwd: Path | None = None) -> str:
     return subprocess.run(
-        ["git", *args], cwd=root(), capture_output=True, text=True,
+        ["git", *args], cwd=(root() if cwd is None else cwd), capture_output=True, text=True,
         encoding="utf-8", errors="replace", check=True,
     ).stdout
 
 
-def non_git_fingerprint(ignored: frozenset[str] = frozenset()) -> dict[str, str]:
+def non_git_fingerprint(
+    ignored: frozenset[str] = frozenset(), repository_root: Path | None = None
+) -> dict[str, str]:
+    base = (repository_root or root()).resolve()
     try:
-        files = [path.relative_to(root()).as_posix() for path in root().rglob("*") if path.is_file()]
-        return {"algorithm": "sha256", "value": digest_files(root(), files, ignored), "status": "ok"}
+        files = [path.relative_to(base).as_posix() for path in base.rglob("*") if path.is_file()]
+        return {"algorithm": "sha256", "value": digest_files(base, files, ignored), "status": "ok"}
     except OSError:
         return {"algorithm": "sha256", "value": "", "status": "unavailable"}
 
 
-def fingerprint(*, ignored_paths: object = None) -> dict[str, str]:
+def fingerprint(*, ignored_paths: object = None, repository_root: Path | None = None) -> dict[str, str]:
     """Return a deterministic safe project-state fingerprint, or explicit unavailability."""
     try:
         ignored = normalize_ignored_paths(ignored_paths)
-        git_output("rev-parse", "--is-inside-work-tree")
+        base = (repository_root or root()).resolve()
+
+        def git(*args: str) -> str:
+            if repository_root is None:
+                return git_output(*args)
+            return git_output(*args, cwd=base)
+
+        git("rev-parse", "--is-inside-work-tree")
         index_digest = hashlib.sha256()
-        for row in git_output("ls-files", "-s", "-z").split("\0"):
+        for row in git("ls-files", "-s", "-z").split("\0"):
             if not row or "\t" not in row:
                 continue
             metadata, name = row.split("\t", 1)
@@ -162,18 +226,18 @@ def fingerprint(*, ignored_paths: object = None) -> dict[str, str]:
             index_digest.update(b"\t")
             index_digest.update(name.encode("utf-8"))
             index_digest.update(b"\0")
-        changed = [name for name in git_output("diff", "--name-only", "-z").split("\0") if name and not excluded(PurePosixPath(name), ignored)]
-        untracked = [name for name in git_output("ls-files", "--others", "--exclude-standard", "-z").split("\0") if name and not excluded(PurePosixPath(name), ignored)]
+        changed = [name for name in git("diff", "--name-only", "-z").split("\0") if name and not excluded(PurePosixPath(name), ignored)]
+        untracked = [name for name in git("ls-files", "--others", "--exclude-standard", "-z").split("\0") if name and not excluded(PurePosixPath(name), ignored)]
         payload = json.dumps({
             "index": index_digest.hexdigest(),
-            "worktree": digest_files(root(), changed, ignored),
-            "untracked": digest_files(root(), untracked, ignored),
+            "worktree": digest_files(base, changed, ignored),
+            "untracked": digest_files(base, untracked, ignored),
         }, sort_keys=True)
         return {"algorithm": "sha256", "value": hashlib.sha256(payload.encode("utf-8")).hexdigest(), "status": "ok"}
     except (OSError, subprocess.SubprocessError):
-        if (root() / ".git").exists():
+        if (base / ".git").exists():
             return {"algorithm": "sha256", "value": "", "status": "unavailable"}
-        return non_git_fingerprint(ignored)
+        return non_git_fingerprint(ignored, repository_root=base)
 
 
 def init(args: argparse.Namespace) -> int:
@@ -204,14 +268,20 @@ def prove(args: argparse.Namespace) -> int:
             if criterion["kind"] != "manual":
                 print("FAIL only manual criteria can be proven manually", file=sys.stderr)
                 return 2
-            criterion["passes"] = True
-            criterion["evidence"] = args.evidence.strip()
-            if not criterion["evidence"]:
+            evidence = args.evidence.strip()
+            if not evidence:
                 print("FAIL evidence must not be empty", file=sys.stderr)
                 return 2
+            current = fingerprint()
+            if current.get("status") != "ok":
+                print("FAIL repository fingerprint unavailable; manual evidence not recorded", file=sys.stderr)
+                return 2
+            criterion["passes"] = True
+            criterion["evidence"] = evidence
             criterion["checkedAt"] = now_utc()
             criterion["durationMs"] = 0
-            criterion["fingerprint"] = fingerprint()
+            criterion["fingerprint"] = current
+            criterion["definitionDigest"] = criterion_definition_digest(criterion)
             save(target, data)
             print(f"PASS recorded evidence for {args.criterion}")
             return 0
@@ -225,15 +295,27 @@ def stored_evidence_is_fresh(work_item: str, criterion_id: str) -> tuple[bool, s
     for criterion in validate(data):
         if criterion["id"] != criterion_id:
             continue
-        evidence = str(criterion.get("evidence", "")).strip()
-        stored = criterion.get("fingerprint")
-        current = fingerprint()
-        if not evidence or criterion.get("passes") is not True:
-            return False, "missing stored acceptance evidence"
-        if not isinstance(stored, dict) or stored.get("status") != "ok" or current.get("status") != "ok" or stored != current:
-            return False, "stale stored acceptance evidence"
-        return True, "fresh stored acceptance evidence"
+        return evidence_freshness(criterion, fingerprint())
     return False, "missing stored acceptance criterion"
+
+
+def evidence_freshness(criterion: dict, current: dict) -> tuple[bool, str]:
+    evidence = str(criterion.get("evidence", "")).strip()
+    stored = criterion.get("fingerprint")
+    if not evidence or criterion.get("passes") is not True:
+        return False, "missing stored acceptance evidence"
+    if criterion.get("kind") == "command":
+        try:
+            resolve_cwd(criterion.get("cwd"))
+        except (OSError, ValueError):
+            return False, "stale command working directory"
+    if criterion.get("definitionDigest") != criterion_definition_digest(criterion):
+        if criterion.get("kind") == "command":
+            return False, "stale command definition: reverify required"
+        return False, "stale manual definition: re-prove required"
+    if not isinstance(stored, dict) or stored.get("status") != "ok" or current.get("status") != "ok" or stored != current:
+        return False, "stale stored acceptance evidence"
+    return True, "fresh stored acceptance evidence"
 
 
 def evaluate(criterion: dict) -> tuple[bool, str]:
@@ -247,23 +329,61 @@ def evaluate(criterion: dict) -> tuple[bool, str]:
         current = fingerprint()
         if stored.get("status") != "ok" or current.get("status") != "ok" or stored != current:
             return False, "stale manual evidence: re-prove required"
+        if criterion.get("definitionDigest") != criterion_definition_digest(criterion):
+            return False, "stale manual definition: re-prove required"
         return criterion.get("passes") is True, "manual evidence"
     started = time.monotonic()
     criterion["checkedAt"] = now_utc()
     criterion["fingerprint"] = fingerprint()
+    criterion["definitionDigest"] = command_definition_digest(criterion)
+    if criterion["fingerprint"].get("status") != "ok":
+        criterion["passes"] = False
+        criterion["evidence"] = "auto: repository fingerprint unavailable; check not run"
+        criterion["durationMs"] = max(0, round((time.monotonic() - started) * 1000))
+        return False, criterion["evidence"]
     try:
+        working_directory = resolve_cwd(criterion.get("cwd"))
         result = subprocess.run(
-            criterion["command"], shell=True, cwd=root(), capture_output=True,
+            criterion["command"], shell=True, cwd=working_directory, capture_output=True,
             text=True, timeout=criterion.get("timeoutSeconds", 600), encoding="utf-8", errors="replace",
         )
-        criterion["passes"] = result.returncode == 0
-        output = (result.stdout or result.stderr).strip().splitlines()
-        criterion["evidence"] = f"auto: exit {result.returncode}; {output[-1][:160] if output else 'no output'}"
+        output = (result.stdout or "") + "\n" + (result.stderr or "")
+        expect = criterion.get("expect")
+        marker_matches = expect is None or expect in output.splitlines()
+        criterion["passes"] = result.returncode == 0 and marker_matches
+        if expect is not None:
+            result_note = "expected marker matched" if marker_matches else "expected marker missing"
+        else:
+            lines = output.strip().splitlines()
+            result_note = lines[-1][:160] if lines else "no output"
+        criterion["evidence"] = f"auto: exit {result.returncode}; {result_note}"
     except subprocess.TimeoutExpired:
         criterion["passes"] = False
         criterion["evidence"] = f"auto: timeout after {criterion.get('timeoutSeconds', 600)} seconds"
+    except (OSError, ValueError):
+        criterion["passes"] = False
+        criterion["evidence"] = "auto: cwd unavailable or outside the repository; check not run"
     criterion["durationMs"] = max(0, round((time.monotonic() - started) * 1000))
     return criterion["passes"], criterion["evidence"]
+
+
+def status(args: argparse.Namespace) -> int:
+    """Report evidence freshness without executing criteria or writing the ledger."""
+    target = gate_path(args.work_item)
+    if not target.exists():
+        print("FAIL gate does not exist", file=sys.stderr)
+        return 2
+    try:
+        data = load(target)
+        criteria = validate(data)
+        current = fingerprint()
+        results = [(criterion["id"], *evidence_freshness(criterion, current)) for criterion in criteria]
+    except (ValueError, json.JSONDecodeError, OSError, subprocess.SubprocessError) as exc:
+        print(f"FAIL invalid or uncheckable gate: {exc}", file=sys.stderr)
+        return 2
+    for cid, fresh, note in results:
+        print(f"{'PASS' if fresh else 'FAIL'} {cid}: {note}")
+    return 0 if all(fresh for _, fresh, _ in results) else 2
 
 
 def check(args: argparse.Namespace) -> int:
@@ -299,6 +419,12 @@ def main() -> int:
     p_check = sub.add_parser("check")
     p_check.add_argument("work_item")
     p_check.set_defaults(func=check)
+    p_status = sub.add_parser("status", help="read evidence freshness without running checks or writing the ledger")
+    p_status.add_argument("work_item")
+    p_status.set_defaults(func=status)
+    p_reverify = sub.add_parser("reverify", help="rerun every command criterion and refresh its evidence")
+    p_reverify.add_argument("work_item")
+    p_reverify.set_defaults(func=check)
     args = parser.parse_args()
     return args.func(args)
 

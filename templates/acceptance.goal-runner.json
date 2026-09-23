@@ -4,7 +4,9 @@
       "id": "runtime-tests",
       "kind": "command",
       "description": "Local unit tests cover telemetry, acceptance freshness, executable-plan validation and benchmark contracts.",
-      "command": "python -m unittest discover -s tests -v"
+      "command": "python -m unittest discover -s tests -v",
+      "cwd": ".",
+      "expect": "OK"
     },
     {
       "id": "plan-passport",
