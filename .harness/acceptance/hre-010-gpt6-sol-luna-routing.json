@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 2,
+  "workItem": "hre-010-gpt6-sol-luna-routing",
+  "criteria": [
+    {
+      "id": "passport-tests",
+      "kind": "command",
+      "description": "GPT-6 Sol/Luna passport validation and planner forwarding regressions pass.",
+      "command": "python -m unittest tests.test_goal_runner_validator tests.test_goal_orchestrator -q",
+      "cwd": ".",
+      "expect": "OK",
+      "timeoutSeconds": 120,
+      "passes": true,
+      "evidence": "auto: exit 0; expected marker matched",
+      "checkedAt": "2026-09-23T20:11:02.963292+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "365dbfc7dcd8c653e93acdf1c53dcda5222323cc98569f2d12f5ff4476971f39",
+        "status": "ok"
+      },
+      "definitionDigest": "06acb1cdbe2c193c54efb6fcc39d4cc68fb5146495fb7d4e2871d84f1e5d4df7",
+      "durationMs": 1594
+    },
+    {
+      "id": "architecture",
+      "kind": "command",
+      "description": "Source role, config, and example passport profile are internally consistent.",
+      "command": "pwsh -NoProfile -File scripts/Test-GoalRunnerArchitecture.ps1",
+      "cwd": ".",
+      "expect": "PASS Goal Runner architecture contract is internally consistent.",
+      "timeoutSeconds": 120,
+      "passes": true,
+      "evidence": "auto: exit 0; expected marker matched",
+      "checkedAt": "2026-09-23T20:11:04.552988+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "365dbfc7dcd8c653e93acdf1c53dcda5222323cc98569f2d12f5ff4476971f39",
+        "status": "ok"
+      },
+      "definitionDigest": "a4db5f26e38e8d1e24ebe462c8e6e623c2a9264c13d91f0185b18169b55aeff7",
+      "durationMs": 3125
+    },
+    {
+      "id": "installer",
+      "kind": "command",
+      "description": "Isolated installer creates the expected model pins without changing the live profile.",
+      "command": "pwsh -NoProfile -File scripts/Test-GoalRunnerInstaller.ps1",
+      "cwd": ".",
+      "expect": "PASS Goal Runner installer is idempotent, rejects unmanaged paths, rolls back safely, and uninstalls cleanly.",
+      "timeoutSeconds": 120,
+      "passes": true,
+      "evidence": "auto: exit 0; expected marker matched",
+      "checkedAt": "2026-09-23T20:11:07.679082+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "365dbfc7dcd8c653e93acdf1c53dcda5222323cc98569f2d12f5ff4476971f39",
+        "status": "ok"
+      },
+      "definitionDigest": "3c0b8cb9f391dbe323d6508f2cb1d4478e73f9f9f646966bd2fd85e3a5f34476",
+      "durationMs": 15391
+    },
+    {
+      "id": "review",
+      "kind": "manual",
+      "description": "Correctness and simplify review confirms runtime boundary, legacy compatibility, and no unsupported cost claim.",
+      "passes": true,
+      "evidence": "Reviewed commit ad9d5da: Luna xhigh worker/explorer, Sol high lead, Astra xhigh verifier; sandbox permissions and legacy passport compatibility preserved. Passport, architecture, isolated installer and full release gate PASS. Runtime loading and cost savings remain unverified.",
+      "checkedAt": "2026-09-23T20:11:58.345725+00:00",
+      "durationMs": 0,
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "365dbfc7dcd8c653e93acdf1c53dcda5222323cc98569f2d12f5ff4476971f39",
+        "status": "ok"
+      },
+      "definitionDigest": "f91dbd15435e62b78553269020ca723232a704a92d59384fb45af7736de945b4"
+    }
+  ]
+}

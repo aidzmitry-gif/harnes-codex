@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 2,
+  "workItem": "hre-009-acceptance-truth",
+  "criteria": [
+    {
+      "id": "regression-tests",
+      "kind": "command",
+      "description": "Acceptance definition and task metrics freshness regressions pass.",
+      "command": "python -m unittest tests.test_acceptance_gate tests.test_harness_metrics -v",
+      "cwd": ".",
+      "expect": "OK",
+      "timeoutSeconds": 120,
+      "passes": true,
+      "evidence": "auto: exit 0; expected marker matched",
+      "checkedAt": "2026-09-23T20:11:03.705265+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "365dbfc7dcd8c653e93acdf1c53dcda5222323cc98569f2d12f5ff4476971f39",
+        "status": "ok"
+      },
+      "definitionDigest": "fa515f78bbe47509bbeef027a4fa6e23a524a3b343e485abcaf102803c2a6857",
+      "durationMs": 4297
+    },
+    {
+      "id": "review",
+      "kind": "manual",
+      "description": "Correctness and simplify review of the shared freshness contract and compatibility.",
+      "passes": true,
+      "evidence": "Reviewed commit ad9d5da: shared evidence_freshness checks criterion digest and repository fingerprint for command/manual; task metrics reuse it. Regression command PASS; release gate PASS, 168 tests. Legacy receipts remain stale until reverify or prove.",
+      "checkedAt": "2026-09-23T20:11:57.987277+00:00",
+      "durationMs": 0,
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "365dbfc7dcd8c653e93acdf1c53dcda5222323cc98569f2d12f5ff4476971f39",
+        "status": "ok"
+      },
+      "definitionDigest": "2fb3e5145bf7510e2b2967dbb6bd4b336461f4cd38a99b08e38bd2af8288c236"
+    }
+  ]
+}
