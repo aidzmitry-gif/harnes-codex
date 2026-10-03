@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from harness_codex import PROJECT_ROOT, _budget_reason, _decode_json
 from goal_runner_validator import validate_passport
 
 
@@ -29,7 +30,12 @@ def _action_key(item: dict[str, Any], waves: dict[str, int]) -> tuple[int, int, 
     )
 
 
-def plan_actions(passport: object, parent_state: str) -> dict[str, Any]:
+def plan_actions(
+    passport: object,
+    parent_state: str,
+    *,
+    trusted_root: str | Path | None = None,
+) -> dict[str, Any]:
     """Return a deterministic, bounded plan without mutating *passport*."""
     if parent_state not in {"running", "paused", "blocked"}:
         raise ValueError("parent state must be running, paused, or blocked")
@@ -110,12 +116,20 @@ def plan_actions(passport: object, parent_state: str) -> dict[str, Any]:
             for item in subgoals
             if item["execution"] == "primary" and item["status"] == "running" and item["ownedPaths"]
         )
+        budget_checked = False
+        budget_reason: str | None = None
         for subgoal in ready:
             if available <= 0:
                 break
             worktree = subgoal["worktree"].casefold() if subgoal["worktree"] is not None else None
             if subgoal["ownedPaths"] and worktree in occupied:
                 actions.append(_action("hold", subgoal["id"], None, "worktree_busy"))
+                continue
+            if "runBudget" in chain and not budget_checked:
+                budget_reason = _budget_reason(passport, trusted_root)
+                budget_checked = True
+            if budget_reason is not None:
+                actions.append(_action("hold", subgoal["id"], None, budget_reason))
                 continue
             actions.append(
                 _action(
@@ -155,7 +169,7 @@ def plan_actions(passport: object, parent_state: str) -> dict[str, Any]:
     }
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None, *, trusted_root: str | Path | None = None) -> int:
     parser = argparse.ArgumentParser(prog="goal_orchestrator.py")
     subparsers = parser.add_subparsers(dest="command", required=True)
     plan = subparsers.add_parser("plan")
@@ -163,10 +177,11 @@ def main(argv: list[str] | None = None) -> int:
     plan.add_argument("--parent-state", choices=("running", "paused", "blocked"), required=True)
     args = parser.parse_args(argv)
     try:
-        passport = json.loads(Path(args.passport).read_text(encoding="utf-8"))
-        result = plan_actions(passport, args.parent_state)
-    except (OSError, ValueError, json.JSONDecodeError) as exc:
-        print(f"FAIL INPUT: {exc}", file=sys.stderr)
+        source = Path(args.passport).read_text(encoding="utf-8")
+        passport = _decode_json(source.encode("utf-8"))
+        result = plan_actions(passport, args.parent_state, trusted_root=trusted_root or PROJECT_ROOT)
+    except (OSError, ValueError, TypeError):
+        print("FAIL INPUT: invalid_or_unreadable_passport", file=sys.stderr)
         return 2
     print(json.dumps(result, sort_keys=True, separators=(",", ":")))
     return 0

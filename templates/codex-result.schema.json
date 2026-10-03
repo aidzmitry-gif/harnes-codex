@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "codex-result.schema.json",
+  "title": "Bounded Codex result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "evidence", "checks", "unknown", "stopReason"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["success", "partial", "blocked"]
+    },
+    "evidence": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "string",
+        "maxLength": 128,
+        "pattern": "^(?![Hh][Tt][Tt][Pp][Ss]?:|[Ff][Ii][Ll][Ee]:|[Jj][Aa][Vv][Aa][Ss][Cc][Rr][Ii][Pp][Tt]:|[Dd][Aa][Tt][Aa]:)[A-Za-z0-9][A-Za-z0-9._:-]{0,127}(?![\\s\\S])"
+      }
+    },
+    "checks": {
+      "type": "object",
+      "maxProperties": 64,
+      "propertyNames": {
+        "type": "string",
+        "maxLength": 64,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}(?![\\s\\S])"
+      },
+      "additionalProperties": {"type": "boolean"}
+    },
+    "unknown": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "string",
+        "maxLength": 128,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}(?![\\s\\S])"
+      }
+    },
+    "stopReason": {
+      "type": ["string", "null"],
+      "enum": ["budget", "missing-evidence", "blocked", "user-input-required", "safety", "other", null]
+    }
+  }
+}

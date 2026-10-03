@@ -1,0 +1,218 @@
+{
+  "schemaVersion": 1,
+  "chain": {
+    "chainId": "HRE-012",
+    "projectRoot": "D:/6 Проекты/Харнес разработка",
+    "dataOwner": "user aidzm",
+    "riskClass": "medium",
+    "externalSideEffectBoundary": "Local offline implementation and verification plus primary-only scoped HRE-012 commit explicitly requested by user; no live model/network calls, installation, external writes, push, PR, deploy or other-project changes.",
+    "parentOutcome": "Bounded Codex trace summary, typed local result validation, and opt-in pre-launch budget hold using existing Harness metrics and planner; no claim of live savings or termination of running GPT.",
+    "status": "complete",
+    "planRevision": 1,
+    "approvedPassportRevision": 1,
+    "approvalProvenance": "Thread 019fca39-7a3e-7a90-a726-a47e3c72dc19: user explicitly said 'коммит и Подтверждаю HRE-012 revision 1'; scoped local commit authorized, no push; HRE-011 authority not reused.",
+    "checkoutWorktreePolicy": "One source writer in the current dirty physical checkout. shared-checkout is an identity label for projectRoot, not a new worktree. Preserve all baseline changes.",
+    "commitPolicy": "primary-only",
+    "canonicalWorkItemPath": ".harness/work/hre-012-measured-execution.md",
+    "primaryTaskId": "/root",
+    "currentTaskId": "/root",
+    "primaryActualModel": null,
+    "primaryActualReasoningEffort": null,
+    "baselineId": "hre012-existing-v1",
+    "treatmentId": "hre012-trace-contract-v1",
+    "metricsPath": ".harness/metrics/hre-012.jsonl",
+    "metricsSchemaVersion": 2,
+    "globalAgentCap": 1,
+    "delegationDepthCap": 1,
+    "standingChainAuthorization": "approved",
+    "standingAuthorizationScope": "bounded continuation",
+    "currentVerifiedSubgoal": "G02",
+    "nextMinimalSliceAcceptance": "All bounded source outcomes and review/gates/clean-HEAD compatibility verified. Final staged C01-C04 proof and the already-authorized primary-only scoped commit are handoff checkpoints; no successor, push, live pilot or release distribution. Native Goal stays active until that commit is verified."
+  },
+  "subgoals": [
+    {
+      "id": "G00",
+      "outcome": "Administrative bootstrap: primary already performed bounded orientation, explicit approval binding and the passing configured prechange gate; no child execution or extra feature scope.",
+      "dependsOn": [],
+      "wave": 1,
+      "riskClass": "medium",
+      "execution": "subagent",
+      "model": "gpt-6-luna",
+      "reasoningEffort": "xhigh",
+      "status": "skipped",
+      "skipReason": "No child/model run: this prerequisite was performed by primary with git baseline/hash observations and PASS prechange. Routing fields are unused; actual primary model remains unknown. Final acceptance denominator stays C01-C04.",
+      "worktree": null,
+      "ownedPaths": []
+    },
+    {
+      "id": "G01",
+      "outcome": "Implement the three bounded offline contracts in the canonical work item, with targeted and local CLI checks.",
+      "dependsOn": [
+        "G00"
+      ],
+      "wave": 2,
+      "subsystem": "codex-trace-result-planner-budget",
+      "riskClass": "medium",
+      "execution": "subagent",
+      "model": "gpt-6-luna",
+      "reasoningEffort": "xhigh",
+      "status": "done",
+      "worktree": "shared-checkout",
+      "ownedPaths": [
+        "harness_codex.py",
+        "tests/test_harness_codex.py",
+        "templates/codex-result.schema.json",
+        "goal_orchestrator.py",
+        "tests/test_goal_orchestrator.py",
+        "docs/CODEX_EXEC.md"
+      ],
+      "acceptanceCriteria": [
+        "C01",
+        "C02",
+        "C03"
+      ]
+    },
+    {
+      "id": "G02",
+      "outcome": "Independent read-only correctness/safety review, separate simplify pass, primary configured gates and fresh final acceptance.",
+      "dependsOn": [
+        "G01"
+      ],
+      "wave": 3,
+      "subsystem": "acceptance-and-integration",
+      "riskClass": "medium",
+      "execution": "subagent",
+      "model": "gpt-6-astra",
+      "reasoningEffort": "xhigh",
+      "status": "done",
+      "worktree": null,
+      "ownedPaths": [],
+      "unlockEvidence": {
+        "workItem": "hre-012",
+        "criterionId": "C03"
+      },
+      "acceptanceCriteria": [
+        "C04",
+        "fresh-C01",
+        "fresh-C02",
+        "fresh-C03"
+      ]
+    }
+  ],
+  "agents": [
+    {
+      "id": "/root/hre012_g01",
+      "subgoalId": "G01",
+      "role": "harness_goal_worker",
+      "model": "gpt-6-luna",
+      "reasoningEffort": "xhigh",
+      "depth": 1,
+      "status": "done",
+      "writer": true,
+      "worktree": "shared-checkout",
+      "ownedPaths": [
+        "harness_codex.py",
+        "tests/test_harness_codex.py",
+        "templates/codex-result.schema.json",
+        "goal_orchestrator.py",
+        "tests/test_goal_orchestrator.py",
+        "docs/CODEX_EXEC.md"
+      ]
+    },
+    {
+      "id": "/root/hre012_g02",
+      "subgoalId": "G02",
+      "role": "harness_goal_verifier",
+      "model": "gpt-6-astra",
+      "reasoningEffort": "xhigh",
+      "depth": 1,
+      "status": "done",
+      "writer": false,
+      "worktree": null,
+      "ownedPaths": []
+    }
+  ],
+  "goalProgress": {
+    "schemaVersion": 1,
+    "attempts": [
+      {
+        "chainId": "HRE-012",
+        "subgoalId": "G01",
+        "strategyId": "bounded-offline-v1",
+        "repositoryFingerprint": {
+          "algorithm": "sha256",
+          "status": "ok",
+          "value": "993fea0ae28de42c676758ccc6783b1596d80dfb6d9b39cee0eb08fc38c31646"
+        },
+        "unlockEvidenceFingerprint": null
+      },
+      {
+        "chainId": "HRE-012",
+        "subgoalId": "G02",
+        "strategyId": "read-only-review-v1",
+        "repositoryFingerprint": {
+          "algorithm": "sha256",
+          "status": "ok",
+          "value": "bc3502cadb6add6955e3e2e5a9291e194a94fb736134912d8844ed1697532f79"
+        },
+        "unlockEvidenceFingerprint": {
+          "algorithm": "sha256",
+          "status": "ok",
+          "value": "30468077953ae2278bf7e410866f8a9ed6d76d9f8203c6a5954326c92a95b934"
+        }
+      },
+      {
+        "chainId": "HRE-012",
+        "subgoalId": "G01",
+        "strategyId": "boundary-hardening-v1",
+        "repositoryFingerprint": {
+          "algorithm": "sha256",
+          "status": "ok",
+          "value": "b27dc3e8bbab42c7eaebe4bdad0a33ee3cab14a01fd2e8a36379a90362a8d12b"
+        },
+        "unlockEvidenceFingerprint": null
+      },
+      {
+        "chainId": "HRE-012",
+        "subgoalId": "G02",
+        "strategyId": "boundary-regression-review-v1",
+        "repositoryFingerprint": {
+          "algorithm": "sha256",
+          "status": "ok",
+          "value": "33d01a57f3394d91169b6aa0689e2b8f8ea5c686b57bbd8b12ea819a123a68ee"
+        },
+        "unlockEvidenceFingerprint": {
+          "algorithm": "sha256",
+          "status": "ok",
+          "value": "10473d1627a2d952429ec82650e749f1ae124ea6ca0dc5b897a859edde6e78cb"
+        }
+      },
+      {
+        "chainId": "HRE-012",
+        "subgoalId": "G01",
+        "strategyId": "safe-serialization-v1",
+        "repositoryFingerprint": {
+          "algorithm": "sha256",
+          "status": "ok",
+          "value": "31b8622b004837f7ad7a7238b6bd2f2a450f6359656594e2129b0066f1e24907"
+        },
+        "unlockEvidenceFingerprint": null
+      },
+      {
+        "chainId": "HRE-012",
+        "subgoalId": "G02",
+        "strategyId": "serialization-confirmation-v1",
+        "repositoryFingerprint": {
+          "algorithm": "sha256",
+          "status": "ok",
+          "value": "8c2eb6d86482ac030320cabde52149cc60e74ef60df1033a423b47b96f8724c4"
+        },
+        "unlockEvidenceFingerprint": {
+          "algorithm": "sha256",
+          "status": "ok",
+          "value": "e0a116c2bf7760efc40edd7c4fbe2b2121c4ad24b12687b5f6531af2f084123f"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 2,
+  "criteria": [
+    {
+      "id": "C01",
+      "kind": "command",
+      "command": "python -B -m unittest discover -s tests -p test_harness_codex.py -k TraceSummaryTests -v",
+      "expect": "test_official_usage (test_harness_codex.TraceSummaryTests.test_official_usage) ... ok",
+      "timeoutSeconds": 60,
+      "passes": true,
+      "evidence": "auto: exit 0; expected marker matched",
+      "checkedAt": "2026-10-03T20:51:16.573703+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "66cd8f0e6d3ba41e6b1a0736ec37c727580112791d29946bccf4f7eee93d0201",
+        "status": "ok"
+      },
+      "definitionDigest": "ae0627db26b193687423aae7ff7a48f0abd5fafbf9e763822d2337cc9c0df81c",
+      "durationMs": 875
+    },
+    {
+      "id": "C02",
+      "kind": "command",
+      "command": "python -B -m unittest discover -s tests -p test_harness_codex.py -k ResultValidationTests -v",
+      "expect": "test_string_not_boolean (test_harness_codex.ResultValidationTests.test_string_not_boolean) ... ok",
+      "timeoutSeconds": 60,
+      "passes": true,
+      "evidence": "auto: exit 0; expected marker matched",
+      "checkedAt": "2026-10-03T20:51:17.439026+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "66cd8f0e6d3ba41e6b1a0736ec37c727580112791d29946bccf4f7eee93d0201",
+        "status": "ok"
+      },
+      "definitionDigest": "8924b035facca1caa270f8f9ddf860eeee7ea3c8cae668486a5d7b2bbec20279",
+      "durationMs": 703
+    },
+    {
+      "id": "C03",
+      "kind": "command",
+      "command": "python -B -m unittest discover -s tests -p test_harness_codex.py -k BudgetGuardTests -v",
+      "expect": "test_budget_limits_exact_and_over (test_harness_codex.BudgetGuardTests.test_budget_limits_exact_and_over) ... ok",
+      "timeoutSeconds": 60,
+      "passes": true,
+      "evidence": "auto: exit 0; expected marker matched",
+      "checkedAt": "2026-10-03T20:51:18.151097+00:00",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "66cd8f0e6d3ba41e6b1a0736ec37c727580112791d29946bccf4f7eee93d0201",
+        "status": "ok"
+      },
+      "definitionDigest": "f3e369e2f68d6a354568012c0097c4baa85f34135385dcb53af4a6b0feb97880",
+      "durationMs": 781
+    },
+    {
+      "id": "C04",
+      "kind": "manual",
+      "description": "Independent correctness/security review plus separate simplify; local CLI scenarios; fresh C01-C03; configured gates and clean HEAD + scoped HRE-012 compatibility; protected baseline preserved; scoped commit readiness and no push. The authorized commit is a subsequent handoff checkpoint, not a reason to claim acceptance before verification.",
+      "passes": true,
+      "evidence": "Independent Astra correctness/security and separate simplify accepted. Primary target 45 PASS; final original configured postchange 228 PASS; clean HEAD 3584851 plus exact HRE012 paths configured release 191 PASS including isolated temp-profile installer. Final EOF-only format has identical AST. Protected baseline 20 hashes preserved; exact-eight staged scope, whitespace and secret-pattern review PASS. No live model, install, external write or push; ready for authorized primary-only local commit.",
+      "checkedAt": "2026-10-03T20:51:20.433768+00:00",
+      "durationMs": 0,
+      "fingerprint": {
+        "algorithm": "sha256",
+        "value": "66cd8f0e6d3ba41e6b1a0736ec37c727580112791d29946bccf4f7eee93d0201",
+        "status": "ok"
+      },
+      "definitionDigest": "656d3a19eb1b32e30cd1257453ef6967f60dac5b47e6835c1fb6f8f3a70b6d42"
+    }
+  ],
+  "workItem": "hre-012"
+}
