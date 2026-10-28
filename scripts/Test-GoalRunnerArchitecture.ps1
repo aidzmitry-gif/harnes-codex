@@ -45,10 +45,11 @@ for path in sorted((root / '.codex/agents').glob('harness-goal-*.toml')):
         assert data.get(key), f'{path.name}: missing {key}'
     assert data['name'] not in roles, f'duplicate agent name {data["name"]}'
     roles[data['name']] = data
-expected = {'harness_goal_explorer', 'harness_goal_worker', 'harness_goal_verifier', 'harness_goal_lead'}
+expected = {'harness_goal_explorer', 'harness_goal_worker', 'harness_goal_verifier', 'harness_goal_lead', 'harness_goal_visual'}
 assert set(roles) == expected, (set(roles), expected)
 assert roles['harness_goal_explorer']['sandbox_mode'] == 'read-only'
 assert roles['harness_goal_verifier']['sandbox_mode'] == 'read-only'
+assert roles['harness_goal_visual']['sandbox_mode'] == 'read-only'
 assert roles['harness_goal_lead']['sandbox_mode'] == 'read-only'
 assert roles['harness_goal_worker']['sandbox_mode'] == 'workspace-write'
 for role, model, effort in (
@@ -56,6 +57,7 @@ for role, model, effort in (
     ('explorer', 'gpt-6-luna', 'xhigh'),
     ('lead', 'gpt-6-sol', 'high'),
     ('verifier', 'gpt-6-astra', 'xhigh'),
+    ('visual', 'gpt-6.1-terra', 'high'),
 ):
     actual = roles['harness_goal_' + role]
     assert (actual['model'], actual['model_reasoning_effort']) == (model, effort)

@@ -163,6 +163,10 @@ Complete the parent Goal only when required subgoals are `done` or accepted as `
 
 At meaningful status updates and final handoff, include one short line: tokens (or unavailable with known coverage), recorded failed attempts, and fresh acceptance percentage with numerator/denominator. Run `python harness_metrics.py task --file <metrics.jsonl> --chain <CHAIN> --work-item <acceptance-id>` from the target project root. Missing telemetry/gate means unknown, never zero/100%. A percentage describes the declared acceptance criteria only, not elapsed time or proof of deployment.
 
+## GPT-6.1 Terra visual route
+
+Use `harness_goal_visual` (`gpt-6.1-terra` / high / read-only) for current screenshots, charts and existing application views. Delegate only when the user or applicable instructions authorize delegation; otherwise the primary performs the permitted inspection. Supply exact pages, visible acceptance criteria and read-only actions. Report source/viewport evidence and unknowns; do not mutate saved data or replace Astra financial, security or final high-risk acceptance. Preserve existing Luna/Sol/Astra roles and legacy `terra`; no automatic model switch. Installation and host compatibility are documented in `docs/GPT61_TERRA.md` in the Harness source checkout, not in the global skill directory.
+
 ## Stop conditions
 
 Stop when permissions, ownership, behavior, isolation, destructive impact, or parent acceptance is ambiguous; a high-risk action lacks approval; or two independent diagnostic attempts fail without localizing the cause.

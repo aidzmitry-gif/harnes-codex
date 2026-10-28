@@ -14,7 +14,7 @@ from tests.test_goal_runner_validator import valid_passport
 
 class GoalOrchestratorTests(unittest.TestCase):
     def test_new_model_and_effort_survive_dispatch_plan(self):
-        for model, effort in (('gpt-5.6-luna', 'xhigh'), ('gpt-6-astra', 'high'), ('gpt-6-luna', 'xhigh'), ('gpt-6-sol', 'high')):
+        for model, effort in (('gpt-5.6-luna', 'xhigh'), ('gpt-6-astra', 'high'), ('gpt-6-luna', 'xhigh'), ('gpt-6-sol', 'high'), ('gpt-6.1-sol', 'high'), ('gpt-6.1-terra', 'medium'), ('gpt-6.1-terra', 'ultra')):
             passport = self.passport()
             passport['subgoals'][1].update(model=model, reasoningEffort=effort)
             action = plan_actions(passport, 'running')['actions'][0]
@@ -22,17 +22,18 @@ class GoalOrchestratorTests(unittest.TestCase):
             self.assertEqual(action['reasoningEffort'], effort)
 
     def test_new_model_requires_valid_effort_and_does_not_relax_authority(self):
-        for effort in (None, 'none', 'fast', [], True):
+        for model in ('gpt-5.6-luna', 'gpt-6-astra', 'gpt-6.1-sol', 'gpt-6.1-terra'):
+            for effort in (None, 'none', 'minimal', 'fast', [], True):
+                passport = self.passport()
+                passport['subgoals'][1].update(model=model, reasoningEffort=effort)
+                with self.subTest(model=model, effort=effort), self.assertRaises(ValueError):
+                    plan_actions(passport, 'running')
             passport = self.passport()
-            passport['subgoals'][1].update(model='gpt-6-astra', reasoningEffort=effort)
-            with self.subTest(effort=effort), self.assertRaises(ValueError):
+            passport['subgoals'][1].update(model=model, reasoningEffort='high')
+            self.assertNotIn('launch', [a['action'] for a in plan_actions(passport, 'paused')['actions']])
+            passport['chain']['standingChainAuthorization'] = 'absent'
+            with self.assertRaisesRegex(ValueError, 'CHAIN_AUTH'):
                 plan_actions(passport, 'running')
-        passport = self.passport()
-        passport['subgoals'][1].update(model='gpt-5.6-luna', reasoningEffort='xhigh')
-        self.assertNotIn('launch', [a['action'] for a in plan_actions(passport, 'paused')['actions']])
-        passport['chain']['standingChainAuthorization'] = 'absent'
-        with self.assertRaisesRegex(ValueError, 'CHAIN_AUTH'):
-            plan_actions(passport, 'running')
 
     def passport(self):
         passport = valid_passport()

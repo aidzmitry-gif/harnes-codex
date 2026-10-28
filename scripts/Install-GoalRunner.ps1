@@ -5,6 +5,7 @@ param(
     [string]$GlobalContextHandoffPath = (Join-Path ([Environment]::GetFolderPath('UserProfile')) '.agents\skills\context-handoff'),
     [string]$GlobalAgentsPath = (Join-Path ([Environment]::GetFolderPath('UserProfile')) '.codex\agents'),
     [string]$ManifestPath = '',
+    [switch]$RolesOnly,
     [switch]$AdoptMatchingLegacyRoles,
     [switch]$AdoptVerifiedLegacyRoles,
     [ValidateSet(12)]
@@ -19,7 +20,7 @@ $sourceContextHandoff = Join-Path $root '.agents\skills\context-handoff'
 $sourceAgents = Join-Path $root '.codex\agents'
 $beginMarker = '# BEGIN harness goal-runner agents'
 $endMarker = '# END harness goal-runner agents'
-$allowedRoleNames = @('harness-goal-explorer.toml', 'harness-goal-lead.toml', 'harness-goal-verifier.toml', 'harness-goal-worker.toml')
+$allowedRoleNames = @('harness-goal-explorer.toml', 'harness-goal-lead.toml', 'harness-goal-verifier.toml', 'harness-goal-visual.toml', 'harness-goal-worker.toml')
 $configDirectory = Split-Path -Parent $ConfigPath
 if (-not $ManifestPath) { $ManifestPath = Join-Path $configDirectory 'goal-runner-install.json' }
 
@@ -44,18 +45,34 @@ function Assert-Junction([string]$Destination, [string]$Source, [string]$Label) 
     }
 }
 
+function Get-RoleFileHash([string]$Path) {
+    # Stream reads remain valid during a no-write WhatIf preview.
+    $stream = [IO.File]::OpenRead($Path)
+    try { return (Get-FileHash -InputStream $stream).Hash }
+    finally { $stream.Dispose() }
+}
+
 function Read-InstallManifest([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
     try { $data = [IO.File]::ReadAllText($Path, [Text.Encoding]::UTF8) | ConvertFrom-Json }
     catch { throw "Invalid Goal Runner install manifest: $Path" }
     if ($data.schemaVersion -ne 1 -or -not $data.roles) { throw "Unsupported Goal Runner install manifest: $Path" }
+    $names = @($data.roles.PSObject.Properties.Name)
+    $expected = if ($names -contains 'harness-goal-visual.toml') { $allowedRoleNames } else { @($allowedRoleNames | Where-Object { $_ -ne 'harness-goal-visual.toml' }) }
+    if ($names.Count -ne $expected.Count -or @(Compare-Object -ReferenceObject $expected -DifferenceObject $names).Count -ne 0) {
+        throw "Install manifest role names do not match the legacy or current allowlist: $Path"
+    }
     return $data
 }
 
-function Get-ManifestRole($Manifest, [string]$Name) {
+function Get-ManifestRole($Manifest, [string]$Name, [switch]$AllowMissing) {
     if (-not $Manifest) { return $null }
     $property = $Manifest.roles.PSObject.Properties | Where-Object Name -eq $Name | Select-Object -First 1
-    if (-not $property -or -not $property.Value.sha256) { throw "Manifest is missing role provenance: $Name" }
+    if (-not $property) {
+        if ($AllowMissing) { return $null }
+        throw "Manifest is missing role provenance: $Name"
+    }
+    if (-not $property.Value.sha256) { throw "Manifest is missing role provenance: $Name" }
     return $property.Value
 }
 
@@ -64,13 +81,14 @@ foreach ($required in @($ConfigPath, $sourceSkill, $sourceContextHandoff, $sourc
 }
 Assert-Toml $ConfigPath
 $roleSources = @(Get-ChildItem -LiteralPath $sourceAgents -Filter 'harness-goal-*.toml' -File)
-if ($roleSources.Count -ne 4) { throw "Expected four Goal Runner roles, found $($roleSources.Count)." }
+if ($roleSources.Count -ne $allowedRoleNames.Count) { throw "Expected $($allowedRoleNames.Count) Goal Runner roles, found $($roleSources.Count)." }
 if (@(Compare-Object -ReferenceObject $allowedRoleNames -DifferenceObject @($roleSources.Name)).Count -ne 0) {
     throw 'Goal Runner source role names do not match the exact allowlist.'
 }
 $roleSources | ForEach-Object { Assert-Toml $_.FullName }
 
 $manifest = Read-InstallManifest $ManifestPath
+if ($RolesOnly -and -not $manifest) { throw 'RolesOnly requires an existing managed install manifest.' }
 if ($manifest) {
     if ([IO.Path]::GetFullPath([string]$manifest.configPath) -ne [IO.Path]::GetFullPath($ConfigPath) -or
         [IO.Path]::GetFullPath([string]$manifest.goalRunner.destination) -ne [IO.Path]::GetFullPath($GlobalSkillPath) -or
@@ -89,13 +107,13 @@ foreach ($source in $roleSources) {
         throw "Agent destination is a directory, expected a file: $destination"
     }
     if (Test-Path -LiteralPath $destination -PathType Leaf) {
-        $actualHash = (Get-FileHash -LiteralPath $destination).Hash
+        $actualHash = Get-RoleFileHash $destination
         if ($manifest) {
             $installedRole = Get-ManifestRole $manifest $source.Name
             if ($actualHash -ne [string]$installedRole.sha256) {
                 throw "Installed managed role was modified; refusing to overwrite: $destination"
             }
-        } elseif ($actualHash -ne (Get-FileHash -LiteralPath $source.FullName).Hash) {
+        } elseif ($actualHash -ne (Get-RoleFileHash $source.FullName)) {
             if (-not $AdoptVerifiedLegacyRoles) {
                 throw "Unmanaged agent file already exists; refusing to overwrite: $destination"
             }
@@ -142,18 +160,20 @@ if ($hasBegin) {
     $candidate = $configText + $separator + $block.TrimStart([char]13, [char]10) + $crlf
 }
 
+if ($RolesOnly) { $candidate = $configText }
 Assert-TomlText $candidate 'managed Goal Runner config'
 
 $needsSkill = -not (Test-Path -LiteralPath $GlobalSkillPath)
 $needsContext = -not (Test-Path -LiteralPath $GlobalContextHandoffPath)
-$approveConfig = $PSCmdlet.ShouldProcess($ConfigPath, "Set Goal Runner subagent cap to $MaxConcurrentSubagents")
+if ($RolesOnly -and ($needsSkill -or $needsContext)) { throw 'RolesOnly requires the existing managed skill junctions.' }
+$approveConfig = if ($RolesOnly) { $true } else { $PSCmdlet.ShouldProcess($ConfigPath, "Set Goal Runner subagent cap to $MaxConcurrentSubagents") }
 $approveSkill = if ($needsSkill) { $PSCmdlet.ShouldProcess($GlobalSkillPath, 'Create Goal Runner skill junction') } else { $true }
 $approveContext = if ($needsContext) { $PSCmdlet.ShouldProcess($GlobalContextHandoffPath, 'Create Context Handoff dependency junction') } else { $true }
-$approveAgents = $PSCmdlet.ShouldProcess($GlobalAgentsPath, 'Install four managed Goal Runner custom agents')
+$approveAgents = $PSCmdlet.ShouldProcess($GlobalAgentsPath, 'Install managed Goal Runner custom agents')
 $approveManifest = $PSCmdlet.ShouldProcess($ManifestPath, 'Write durable Goal Runner install provenance')
 
 if (-not ($approveConfig -and $approveSkill -and $approveContext -and $approveAgents -and $approveManifest)) {
-    if ($WhatIfPreference) { Write-Host "WHATIF Goal Runner would request exactly $MaxConcurrentSubagents subagents." -ForegroundColor Yellow }
+    if ($WhatIfPreference) { Write-Host 'WHATIF Goal Runner preview; no files changed.' -ForegroundColor Yellow }
     else { Write-Host 'CANCELLED Goal Runner installation was not fully approved.' -ForegroundColor Yellow }
     return
 }
@@ -185,10 +205,12 @@ foreach ($source in $roleSources) {
 }
 
 try {
-    if (-not (Test-Path -LiteralPath $backupPath)) { Copy-Item -LiteralPath $ConfigPath -Destination $backupPath }
-    Copy-Item -LiteralPath $candidateConfig -Destination $ConfigPath -Force
-    $configWritten = $true
-    Assert-Toml $ConfigPath
+    if (-not $RolesOnly) {
+        if (-not (Test-Path -LiteralPath $backupPath)) { Copy-Item -LiteralPath $ConfigPath -Destination $backupPath }
+        Copy-Item -LiteralPath $candidateConfig -Destination $ConfigPath -Force
+        $configWritten = $true
+        Assert-Toml $ConfigPath
+    }
 
     if ($needsSkill) {
         New-Item -ItemType Directory -Path (Split-Path -Parent $GlobalSkillPath) -Force | Out-Null
@@ -209,9 +231,9 @@ try {
     $installedRoles = [ordered]@{}
     foreach ($source in $roleSources) {
         $destination = Join-Path $GlobalAgentsPath $source.Name
-        $priorRole = if ($manifest) { Get-ManifestRole $manifest $source.Name } else { $null }
+        $priorRole = if ($manifest) { Get-ManifestRole $manifest $source.Name -AllowMissing:($source.Name -eq 'harness-goal-visual.toml') } else { $null }
         $ownership = if ($priorRole -and $priorRole.ownership) { [string]$priorRole.ownership } elseif ($legacyAdopted[$source.Name]) { 'adopted-explicit' } else { 'managed' }
-        $installedRoles[$source.Name] = [ordered]@{ sha256 = (Get-FileHash -LiteralPath $destination).Hash; ownership = $ownership }
+        $installedRoles[$source.Name] = [ordered]@{ sha256 = (Get-RoleFileHash $destination); ownership = $ownership }
     }
     $manifestData = [ordered]@{
         schemaVersion = 1
@@ -221,6 +243,7 @@ try {
         contextHandoff = [ordered]@{ source = [IO.Path]::GetFullPath($sourceContextHandoff); destination = [IO.Path]::GetFullPath($GlobalContextHandoffPath) }
         roles = $installedRoles
     }
+    if ($RolesOnly) { $manifestData = $manifest; $manifestData.roles = $installedRoles }
     New-Item -ItemType Directory -Path (Split-Path -Parent $ManifestPath) -Force | Out-Null
     [IO.File]::WriteAllText($ManifestPath, (($manifestData | ConvertTo-Json -Depth 6) + [Environment]::NewLine), [Text.UTF8Encoding]::new($false))
     $manifestWritten = $true
@@ -251,5 +274,6 @@ try {
     }
 }
 
-Write-Host "PASS Goal Runner installed with a requested cap of exactly $MaxConcurrentSubagents subagents and a durable manifest." -ForegroundColor Green
+if ($RolesOnly) { Write-Host 'PASS Goal Runner roles updated; config and cap unchanged.' -ForegroundColor Green }
+else { Write-Host "PASS Goal Runner installed with a requested cap of exactly $MaxConcurrentSubagents subagents and a durable manifest." -ForegroundColor Green }
 Write-Host 'Restart Codex or start a new app session before testing the new cap and roles.' -ForegroundColor Yellow

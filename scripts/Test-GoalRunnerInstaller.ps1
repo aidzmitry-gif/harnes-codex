@@ -37,16 +37,25 @@ try {
         '-GlobalAgentsPath', $rolesPath,
         '-MaxConcurrentSubagents', '12'
     )
+    $unmanagedConfigHash = (Get-FileHash -LiteralPath $configPath).Hash
+    $previousErrorPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    & powershell @installArgs -RolesOnly 2>$null
+    $unmanagedExit = $LASTEXITCODE
+    $ErrorActionPreference = $previousErrorPreference
+    if ($unmanagedExit -eq 0 -or (Get-FileHash -LiteralPath $configPath).Hash -ne $unmanagedConfigHash -or (Test-Path -LiteralPath $rolesPath) -or (Test-Path -LiteralPath $skillPath)) {
+        throw 'RolesOnly accepted or changed an unmanaged installation.'
+    }
     & powershell @installArgs
     if ($LASTEXITCODE -ne 0) { throw 'First isolated install failed.' }
     $installedConfig = Get-Content -LiteralPath $configPath -Raw
     if (-not $installedConfig.Contains('default_subagent_model = "gpt-6-luna"') -or -not $installedConfig.Contains('default_subagent_reasoning_effort = "xhigh"')) {
         throw 'Installed defaults do not match the approved Luna xhigh profile.'
     }
-    foreach ($role in @('worker', 'explorer', 'lead', 'verifier')) {
+    foreach ($role in @('worker', 'explorer', 'lead', 'verifier', 'visual')) {
         $installedRole = Get-Content -LiteralPath (Join-Path $rolesPath "harness-goal-$role.toml") -Raw
-        $expectedModel = if ($role -in @('worker', 'explorer')) { 'gpt-6-luna' } elseif ($role -eq 'lead') { 'gpt-6-sol' } else { 'gpt-6-astra' }
-        $expectedEffort = if ($role -eq 'lead') { 'high' } else { 'xhigh' }
+        $expectedModel = if ($role -in @('worker', 'explorer')) { 'gpt-6-luna' } elseif ($role -eq 'lead') { 'gpt-6-sol' } elseif ($role -eq 'visual') { 'gpt-6.1-terra' } else { 'gpt-6-astra' }
+        $expectedEffort = if ($role -in @('lead', 'visual')) { 'high' } else { 'xhigh' }
         if (-not $installedRole.Contains("model = `"$expectedModel`"") -or -not $installedRole.Contains("model_reasoning_effort = `"$expectedEffort`"")) {
             throw "Installed role has an unexpected model or effort: $role"
         }
@@ -63,13 +72,40 @@ try {
     $configText = Get-Content -LiteralPath $configPath -Raw
     if (([regex]::Matches($configText, [regex]::Escape('# BEGIN harness goal-runner agents')).Count) -ne 1) { throw 'Managed config block is duplicated.' }
     if (([regex]::Matches($configText, [regex]::Escape('# END harness goal-runner agents')).Count) -ne 1) { throw 'Managed config end marker is duplicated.' }
-    if ((Get-ChildItem -LiteralPath $rolesPath -Filter 'harness-goal-*.toml' -File).Count -ne 4) { throw 'Four role files were not installed.' }
+    if ((Get-ChildItem -LiteralPath $rolesPath -Filter 'harness-goal-*.toml' -File).Count -ne 5) { throw 'Five role files were not installed.' }
     foreach ($junction in @($skillPath, $contextPath)) {
         $item = Get-Item -LiteralPath $junction -Force
         if ($item.LinkType -ne 'Junction') { throw "Expected junction: $junction" }
     }
     & python -c "import sys,tomllib; d=tomllib.load(open(sys.argv[1],'br')); assert d['agents']['max_concurrent_threads_per_session']==12" $configPath
     if ($LASTEXITCODE -ne 0) { throw 'Installed TOML has the wrong cap.' }
+
+    # Simulate a legacy four-role install with a custom cap; only test-owned files.
+    $visualPath = Join-Path $rolesPath 'harness-goal-visual.toml'
+    $legacyManifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $legacyManifest.roles.PSObject.Properties.Remove('harness-goal-visual.toml')
+    [IO.File]::WriteAllText($manifestPath, (($legacyManifest | ConvertTo-Json -Depth 6) + [Environment]::NewLine), [Text.UTF8Encoding]::new($false))
+    Assert-TestRoot $visualPath
+    Remove-Item -LiteralPath $visualPath
+    $customConfig = [IO.File]::ReadAllText($configPath).Replace('max_concurrent_threads_per_session = 12', 'max_concurrent_threads_per_session = 20')
+    [IO.File]::WriteAllText($configPath, $customConfig, [Text.UTF8Encoding]::new($false))
+    $customConfigHash = (Get-FileHash -LiteralPath $configPath).Hash
+    $legacyManifestHash = (Get-FileHash -LiteralPath $manifestPath).Hash
+    & powershell @installArgs -RolesOnly -WhatIf
+    if ($LASTEXITCODE -ne 0) { throw 'RolesOnly preview failed.' }
+    if ((Test-Path -LiteralPath $visualPath) -or (Get-FileHash -LiteralPath $manifestPath).Hash -ne $legacyManifestHash -or (Get-FileHash -LiteralPath $configPath).Hash -ne $customConfigHash) {
+        throw 'RolesOnly preview changed the legacy install.'
+    }
+    & powershell @installArgs -RolesOnly
+    if ($LASTEXITCODE -ne 0) { throw 'Legacy RolesOnly upgrade failed.' }
+    if ((Get-FileHash -LiteralPath $configPath).Hash -ne $customConfigHash) { throw 'RolesOnly changed custom config/cap.' }
+    $upgraded = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if (@($upgraded.roles.PSObject.Properties).Count -ne 5 -or -not (Test-Path -LiteralPath $visualPath)) { throw 'RolesOnly did not install the fifth owned role.' }
+    $upgradedHash = (Get-FileHash -LiteralPath $manifestPath).Hash
+    & powershell @installArgs -RolesOnly
+    if ($LASTEXITCODE -ne 0 -or (Get-FileHash -LiteralPath $manifestPath).Hash -ne $upgradedHash -or (Get-FileHash -LiteralPath $configPath).Hash -ne $customConfigHash) {
+        throw 'RolesOnly retry was not idempotent.'
+    }
 
     $failureDir = Join-Path $tempRoot 'failure-home'
     $failureConfig = Join-Path $failureDir 'config.toml'
@@ -150,9 +186,12 @@ try {
     $ErrorActionPreference = 'Continue'
     & powershell -NoProfile -ExecutionPolicy Bypass -File $uninstaller -ConfigPath $configPath -GlobalSkillPath $skillPath -GlobalAgentsPath $rolesPath 2>$null
     $tamperExitCode = $LASTEXITCODE
+    & powershell @installArgs -RolesOnly 2>$null
+    $tamperInstallExitCode = $LASTEXITCODE
     $ErrorActionPreference = $previousErrorPreference
     [IO.File]::WriteAllBytes($manifestPath, $manifestBytes)
     if ($tamperExitCode -eq 0) { throw 'Uninstaller accepted a manifest path traversal role name.' }
+    if ($tamperInstallExitCode -eq 0) { throw 'Installer accepted an unknown manifest role name.' }
     if ((Get-FileHash -LiteralPath $configPath).Hash -ne $beforeTamperReject) { throw 'Tampered manifest refusal changed config.' }
 
     & powershell -NoProfile -ExecutionPolicy Bypass -File $uninstaller -ConfigPath $configPath -GlobalSkillPath $skillPath -GlobalAgentsPath $rolesPath
@@ -164,7 +203,24 @@ try {
     if (-not (Test-Path -LiteralPath $contextPath)) { throw 'Uninstaller removed the shared Context Handoff dependency.' }
     if (Test-Path -LiteralPath $manifestPath) { throw 'Uninstaller left the install manifest.' }
 
-    Write-Host 'PASS Goal Runner installer is idempotent, rejects unmanaged paths, rolls back safely, and uninstalls cleanly.' -ForegroundColor Green
+    $legacyInstallArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $installer,
+        '-ConfigPath', $legacyConfig, '-GlobalSkillPath', (Join-Path $tempRoot 'legacy-skill'),
+        '-GlobalContextHandoffPath', (Join-Path $tempRoot 'legacy-context'),
+        '-GlobalAgentsPath', $legacyRoles, '-MaxConcurrentSubagents', '12', '-AdoptMatchingLegacyRoles')
+    & powershell @legacyInstallArgs
+    if ($LASTEXITCODE -ne 0) { throw 'Legacy uninstall fixture installation failed.' }
+    $legacyReceipt = Join-Path $legacyDir 'goal-runner-install.json'
+    $fourRoles = Get-Content -LiteralPath $legacyReceipt -Raw -Encoding UTF8 | ConvertFrom-Json
+    $fourRoles.roles.PSObject.Properties.Remove('harness-goal-visual.toml')
+    [IO.File]::WriteAllText($legacyReceipt, (($fourRoles | ConvertTo-Json -Depth 6) + [Environment]::NewLine), [Text.UTF8Encoding]::new($false))
+    $legacyVisual = Join-Path $legacyRoles 'harness-goal-visual.toml'
+    Assert-TestRoot $legacyVisual
+    Remove-Item -LiteralPath $legacyVisual
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $uninstaller -ConfigPath $legacyConfig -GlobalSkillPath (Join-Path $tempRoot 'legacy-skill') -GlobalAgentsPath $legacyRoles
+    if ($LASTEXITCODE -ne 0 -or (Test-Path -LiteralPath $legacyReceipt) -or (Get-ChildItem -LiteralPath $legacyRoles -Filter 'harness-goal-*.toml' -File).Count -ne 0) {
+        throw 'Legacy four-role uninstall failed.'
+    }
+    Write-Host 'PASS Goal Runner installer lifecycle, five roles, legacy upgrade/uninstall and config-preserving RolesOnly.' -ForegroundColor Green
 } finally {
     Assert-TestRoot $tempRoot
     foreach ($junction in @(

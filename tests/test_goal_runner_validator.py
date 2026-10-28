@@ -31,17 +31,28 @@ class GoalPassportValidationTests(unittest.TestCase):
         self.assertEqual([], validate_passport(valid_passport()))
 
     def test_gpt6_sol_luna_require_callable_effort(self):
-        for model in ('gpt-6-sol', 'gpt-6-luna'):
-            for effort in ('low', 'medium', 'high', 'xhigh', 'max'):
+        for model in ('gpt-6-sol', 'gpt-6-luna', 'gpt-6.1-sol', 'gpt-6.1-terra'):
+            efforts = ('low', 'medium', 'high', 'xhigh', 'max')
+            if model in ('gpt-6.1-sol', 'gpt-6.1-terra'):
+                efforts += ('ultra',)
+            for effort in efforts:
                 with self.subTest(model=model, effort=effort):
                     passport = valid_passport()
                     passport['subgoals'][1].update(model=model, reasoningEffort=effort)
                     self.assertEqual([], validate_passport(passport))
-            for effort in (None, 'none', 'ultra', 'fast'):
+            for effort in (None, 'none', 'minimal', 'fast', [], True):
                 with self.subTest(model=model, effort=effort):
                     passport = valid_passport()
                     passport['subgoals'][1].update(model=model, reasoningEffort=effort)
                     self.assert_code(passport, 'SUBGOAL_EFFORT')
+            passport = valid_passport()
+            passport['subgoals'][1]['model'] = model
+            passport['subgoals'][1].pop('reasoningEffort', None)
+            self.assert_code(passport, 'SUBGOAL_EFFORT')
+        for model in ('gpt-6-sol', 'gpt-6-luna'):
+            passport = valid_passport()
+            passport['subgoals'][1].update(model=model, reasoningEffort='ultra')
+            self.assert_code(passport, 'SUBGOAL_EFFORT')
 
     def test_root_schema_version_requires_exact_integer(self):
         self.assertEqual([], validate_passport(valid_passport()))

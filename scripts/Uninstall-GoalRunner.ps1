@@ -10,7 +10,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $beginMarker = '# BEGIN harness goal-runner agents'
 $endMarker = '# END harness goal-runner agents'
-$allowedRoleNames = @('harness-goal-explorer.toml', 'harness-goal-lead.toml', 'harness-goal-verifier.toml', 'harness-goal-worker.toml')
+$allowedRoleNames = @('harness-goal-explorer.toml', 'harness-goal-lead.toml', 'harness-goal-verifier.toml', 'harness-goal-visual.toml', 'harness-goal-worker.toml')
 $configDirectory = Split-Path -Parent $ConfigPath
 if (-not $ManifestPath) { $ManifestPath = Join-Path $configDirectory 'goal-runner-install.json' }
 
@@ -62,8 +62,9 @@ if (Test-Path -LiteralPath $GlobalSkillPath) {
 }
 
 $roleRecords = @($manifest.roles.PSObject.Properties)
-if ($roleRecords.Count -ne 4) { throw "Expected four installed role records, found $($roleRecords.Count)." }
-if (@(Compare-Object -ReferenceObject $allowedRoleNames -DifferenceObject @($roleRecords.Name)).Count -ne 0) {
+$expectedRoleNames = if ($roleRecords.Name -contains 'harness-goal-visual.toml') { $allowedRoleNames } else { @($allowedRoleNames | Where-Object { $_ -ne 'harness-goal-visual.toml' }) }
+if ($roleRecords.Count -ne $expectedRoleNames.Count) { throw "Expected $($expectedRoleNames.Count) installed role records, found $($roleRecords.Count)." }
+if (@(Compare-Object -ReferenceObject $expectedRoleNames -DifferenceObject @($roleRecords.Name)).Count -ne 0) {
     throw 'Install manifest role names do not match the exact allowlist.'
 }
 foreach ($record in $roleRecords) {
@@ -82,7 +83,7 @@ Assert-TomlText $candidate 'Goal Runner uninstall config'
 
 $approveConfig = $PSCmdlet.ShouldProcess($ConfigPath, 'Remove managed Goal Runner [agents] block')
 $approveSkill = $PSCmdlet.ShouldProcess($GlobalSkillPath, 'Remove managed Goal Runner skill junction')
-$approveAgents = $PSCmdlet.ShouldProcess($GlobalAgentsPath, 'Remove four manifest-owned Goal Runner agent files')
+$approveAgents = $PSCmdlet.ShouldProcess($GlobalAgentsPath, 'Remove manifest-owned Goal Runner agent files')
 $approveManifest = $PSCmdlet.ShouldProcess($ManifestPath, 'Remove Goal Runner install manifest')
 if (-not ($approveConfig -and $approveSkill -and $approveAgents -and $approveManifest)) { return }
 
