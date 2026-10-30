@@ -30,6 +30,9 @@ class HarnessDistributionTests(unittest.TestCase):
             path = self.source / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"{}\n" if name.endswith(".json") else b"# fixture\n")
+        # The release now carries its CLI; wrapper tests must invoke real code.
+        if 'harness_distribution.py' in hd.FILES:
+            (self.source / 'harness_distribution.py').write_bytes(Path(hd.__file__).read_bytes())
         self.publish("test-1")
 
     def remove_owned_readonly(self, function, path, error):
@@ -59,18 +62,84 @@ class HarnessDistributionTests(unittest.TestCase):
             if name.endswith(".py"):
                 hd.ast.parse((source / name).read_bytes())
 
+    def test_fresh_real_bundle_imports_without_source_pythonpath(self):
+        repo = Path(__file__).resolve().parents[1]
+        self.assertIn('harness_codex.py', hd.FILES)
+        self.assertIn('harness_instruction_audit.py', hd.FILES)
+        for name in hd.FILES:
+            (self.source / name).write_bytes((repo / name).read_bytes())
+        self.publish('fresh-import-test')
+        self.install()
+        result = subprocess.run(
+            [sys.executable, '-I', '-B', '-c',
+             "import sys, importlib; from pathlib import Path; sys.path.insert(0, sys.argv[1]); "
+             "[importlib.import_module(name) for name in sys.argv[2].split(',')]; import harness_codex; "
+             "assert harness_codex.PROJECT_ROOT == Path(sys.argv[1]); print('IMPORT_PASS')",
+             str(self.project), ','.join(Path(name).stem for name in hd.FILES if name.endswith('.py'))],
+            cwd=self.project, capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), 'IMPORT_PASS')
+
+    def install_legacy_fixture(self):
+        files = {name: hd.digest((self.source / name).read_bytes()) for name in hd.LEGACY_FILES}
+        receipt = {'schemaVersion': 1, 'releaseId': 'legacy-18', 'files': files,
+                   'bundleHash': hd.digest(hd.encoded({'releaseId': 'legacy-18', 'files': files}))}
+        for name in hd.LEGACY_FILES:
+            target = self.project / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes((self.source / name).read_bytes())
+        (self.project / hd.RECEIPT).parent.mkdir(exist_ok=True)
+        (self.project / hd.RECEIPT).write_bytes(hd.encoded(receipt))
+
+    def test_legacy_receipt_verifies_and_migrates_without_losing_protection(self):
+        self.install_legacy_fixture()
+        self.assertEqual(hd.verify(self.project)['verifiedFiles'], 18)
+        plan = hd.inspect(self.source, self.project)[0]
+        self.assertTrue(plan['canApply'])
+        self.assertEqual(next(row['action'] for row in plan['files']
+                              if row['path'] == 'harness_codex.py'), 'create')
+        self.install()
+        self.assertEqual(hd.verify(self.project)['verifiedFiles'], len(hd.FILES))
+
+    def test_legacy_receipt_never_owns_a_new_conflicting_file(self):
+        self.install_legacy_fixture()
+        (self.project / 'harness_codex.py').write_bytes(b'# owner custom helper\n')
+        plan = hd.inspect(self.source, self.project)[0]
+        self.assertFalse(plan['canApply'])
+        self.assertEqual(next(row['action'] for row in plan['files']
+                              if row['path'] == 'harness_codex.py'), 'conflict')
+        (self.project / 'goal_orchestrator.py').write_bytes(b'# owner modified core\n')
+        self.assertFalse(hd.inspect(self.source, self.project)[0]['canApply'])
+
     @unittest.skipUnless(shutil.which("git"), "Git not available")
     def test_manifest_survives_git_checkout_with_windows_autocrlf(self):
         repo = Path(__file__).resolve().parents[1]
-        shutil.copyfile(repo / ".gitattributes", self.source / ".gitattributes")
-        exported = self.base / "checkout"
-        exported.mkdir()
-        for arguments in (("init", "--quiet"), ("add", "--all"),
-                          ("checkout-index", "--all", "--prefix=" + exported.as_posix() + "/")):
-            result = subprocess.run(["git", "-C", str(self.source), "-c", "core.autocrlf=true", *arguments],
-                                    capture_output=True, text=True, timeout=15)
-            self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(hd.load_release(exported)[0], hd.load_release(self.source)[0])
+        # Use real payload bytes, including mixed newlines, rather than LF-only stubs.
+        for autocrlf in ("true", "false"):
+            with self.subTest(autocrlf=autocrlf):
+                source = self.base / ("git-source-" + autocrlf)
+                exported = self.base / ("checkout-" + autocrlf)
+                project = self.base / ("installed-" + autocrlf)
+                source.mkdir()
+                exported.mkdir()
+                project.mkdir()
+                for name in (*hd.FILES, hd.RELEASE, ".gitattributes"):
+                    target = source / name
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes((repo / name).read_bytes())
+                expected, payload = hd.load_release(source)
+                for arguments in (("init", "--quiet"), ("add", "--all"),
+                                  ("checkout-index", "--all", "--prefix=" + exported.as_posix() + "/")):
+                    result = subprocess.run(
+                        ["git", "-C", str(source), "-c", "core.autocrlf=" + autocrlf, *arguments],
+                        capture_output=True, text=True, timeout=15)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                actual, exported_payload = hd.load_release(exported)
+                self.assertEqual(actual, expected)
+                self.assertEqual(exported_payload, payload)
+                plan = hd.inspect(exported, project)[0]
+                hd.apply(exported, project, plan["planHash"], idle_confirmed=True)
+                self.assertEqual(hd.verify(project)["verifiedFiles"], len(hd.FILES))
 
     def test_plan_is_read_only_and_first_install_verifies_repeat_is_noop(self):
         before = list(self.project.rglob("*"))
@@ -312,7 +381,7 @@ class HarnessDistributionTests(unittest.TestCase):
             row = json.loads(result.stdout)
             self.assertEqual(row["status"], status)
             self.assertEqual(row["project"], "Проверка UTF-8")
-            self.assertEqual(row["evidence"]["verifiedFiles"], 18)
+            self.assertEqual(row["evidence"]["verifiedFiles"], len(hd.FILES))
             self.assertEqual(row["evidence"]["projectAcceptance"], "not-run")
         (self.project / "goal_progress.py").write_bytes(b"# owner edit\n")
         entries = self.registry()["projects"] + [

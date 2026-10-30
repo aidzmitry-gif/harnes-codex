@@ -1,25 +1,29 @@
 {
-  "bundleHash": "481a7064924a06d53f4c95738de190f195a34ec60b7361787ab529122419de09",
+  "bundleHash": "a42837114f5ecc1cddb7565fafbcfaf747d2a0657f1ba8c6713c0aa04206bf2b",
   "files": {
     "acceptance_gate.py": "e47c08b535091fbf0c3f4a18c7bd1e291491d364fc612bc13c2efea48c02d8fd",
-    "docs/ENGINEERING_LOOP.md": "c5c3ede29ffd4ec208877e2504daa2f21db9be60b3acbf5be19f2beed39958df",
+    "docs/ENGINEERING_LOOP.md": "e53aaeb149800e1c6a8da875fc1fa26dcf88e8149f39dc1e2193879c34484419",
+    "docs/LOCAL_USAGE.md": "e6ba346f5d176c247537c513dc675175222947b65b5d0642b09a41e25ee03f41",
     "goal_orchestrator.py": "91629024ae1e97e79b688804eda2f222ae562b5e60fa60afaac23e0c976868b0",
     "goal_progress.py": "a10af08c0be512fc2662c2f77b650e9c2e6dfb0eda3abb58f541a63a732b058a",
-    "goal_runner_validator.py": "5f3d07a5f3aa5dca8964a128b13c9be6c37e96a2f46247da4313a77008f6a503",
+    "goal_runner_validator.py": "fed8449cc49546431c1829dc183ee337d7abae5e63ff06ea3dfea48b732dfe19",
     "harness_benchmark.py": "19ca3f4102e7a496c0ff319d12c0fc6e8810518946fae7304453088d0d298a45",
-    "harness_metrics.py": "b8541e0a6e7163353f883827382a01b81261fff8d03252f2c443aa41213f79d3",
+    "harness_codex.py": "9d09c6f5061510a03322d55fdfa1da0867dc4c21cbc2c0ff68e0b1dcb525f8e9",
+    "harness_distribution.py": "a8302a9e902b8df24acc781b4042a09d179a50f7c3b6517133f3a1234060afc2",
+    "harness_instruction_audit.py": "8ae2f57523818a820e3f5b1e2a4f913e12dc5566266876265600021cd051795e",
+    "harness_metrics.py": "12a752a282ff7e8e07663198bdc7f6ae019c165f224b06b2b7931ab0834bcf87",
     "scripts/Invoke-HarnessGate.ps1": "0082ac86fa21b652f4f3541914b2011a6f4896698e80d349ed328ceffa8062d3",
     "templates/acceptance.example.json": "8d56fec9cd5252cfd80984184bd52b60f57e00d026670593849d4b47f75bdddd",
     "templates/goal-passport.example.json": "12add7209544d98b823a37ae4ca984a76da2c344170d4789bc84d2739e446346",
     "templates/project-profile.example.json": "7e44e9cbf0b05863d37a2f462d79ae06cb403f303659d7d43490e829a6f7f190",
     "templates/update-batch.example.json": "292c349a5a7c7abb4021072318cb9d3e28b0e0e6dbf9e2680582302fd3680466",
     "templates/update-candidate.example.json": "82a06aa7fbbe4b9513eb84c976c913be66e30ea1e9da423e5fa7ceea21c21b61",
-    "templates/update-radar-task.md": "c0f5a8addd5972fc9e3211b20554b13950a68d5d8d34878b60428d9ad6fa5237",
+    "templates/update-radar-task.md": "eb690820e49755c601163af15ed9ce77b793c616cd620c179f69a63c7e9e8e44",
     "templates/work-item.md": "38e3063cdbb6bc9419054e7fdd707f67064d6701b4cb5d1af96dde1f8861fbd0",
     "tests/fixtures/hre-001-benchmark.json": "ed2631e08f6b4d9db9ab6fbf1125f733f528a39ccf2cb6ae10d020c6b9370203",
     "update_impact.py": "1d926997d76cd4fe7a780559a9da7ea40cf309601ef2cdc9bb72afdefbc006d6",
-    "update_radar.py": "d5043ff280bd3db60ee63a0fd336794c17b2d257cf791966bb6b0ef79e054388"
+    "update_radar.py": "077f17a97d14a9e5c93062f861de80b375762dcfdeb5dd699ced90ea454748cb"
   },
-  "releaseId": "2026.10.28-terra.1",
+  "releaseId": "2026.10.29-unified.local.1",
   "schemaVersion": 1
 }

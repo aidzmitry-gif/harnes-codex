@@ -1,4 +1,5 @@
 import hashlib
+import copy
 import json
 import subprocess
 import sys
@@ -49,6 +50,15 @@ def candidate(identifier="codex-changelog-20260811", impact=None):
 
 def batch(*candidates):
     return {"schemaVersion": 1, "candidates": list(candidates)}
+
+
+def assessment(**changes):
+    result = {"schemaVersion": 1, "evidence": ["Local check: feature unavailable; no model call executed."],
+              "blocker": "The required local feature is unavailable.",
+              "recheckWhen": "Recheck after the local feature or CLI version changes.",
+              "prerequisites": {"cli-version": "test-1", "feature": "unavailable"}}
+    result.update(changes)
+    return result
 
 
 class UpdateRadarTests(unittest.TestCase):
@@ -151,7 +161,7 @@ class UpdateRadarTests(unittest.TestCase):
             self.assertEqual(1, observed["pendingCount"])
             self.assertEqual(0, observed["unknownEvaluationCount"])
             self.assertEqual(0, observed["counts"]["new"])
-            self.assertEqual(2, json.loads(state.read_text())["schemaVersion"])
+            self.assertEqual(3, json.loads(state.read_text())["schemaVersion"])
 
     def test_ignore_is_not_pending_or_legacy_unknown(self):
         low = {"security": 0, "compatibility": 0, "userTime": 0, "reliability": 0, "implementationCost": 2}
@@ -257,6 +267,265 @@ class UpdateRadarTests(unittest.TestCase):
             self.assertFalse(state.exists())
         self.assertEqual("no-meaningful-updates", result["status"])
         self.assertEqual(0, result["counts"]["input"])
+
+    def test_candidate_facts_survive_empty_batch_and_restart(self):
+        item = candidate()
+        with workspace_state() as state:
+            update_radar.scan(batch(item), state)
+            before = state.read_bytes()
+            result = update_radar.pending(state)
+            self.assertEqual(item, result["pending"][0]["candidate"])
+            self.assertEqual(item, update_radar.scan(batch(), state)["pending"][0]["candidate"])
+            self.assertEqual(before, state.read_bytes())
+
+    def test_deferred_evidence_is_durable_and_exact_retry_is_noop(self):
+        item = candidate(); digest = update_radar._digest(item); check = assessment()
+        with workspace_state() as state:
+            update_radar.scan(batch(item), state)
+            first = update_radar.defer(item["id"], digest, check, state)
+            before = state.read_bytes()
+            second = update_radar.defer(item["id"], digest, check, state)
+            result = update_radar.pending(state, check["prerequisites"])
+            self.assertTrue(first["stateChanged"])
+            self.assertFalse(second["stateChanged"])
+            self.assertEqual(check, result["pending"][0]["assessment"])
+            self.assertEqual(update_radar._digest(check), first["assessmentHash"])
+            self.assertIsNone(json.loads(state.read_text())["evaluations"][item["id"]]["resolution"])
+            self.assertEqual(before, state.read_bytes())
+
+    def test_prerequisite_comparison_skips_only_confirmed_unchanged_checks(self):
+        item = candidate(); check = assessment()
+        with workspace_state() as state:
+            update_radar.scan(batch(item), state)
+            update_radar.defer(item["id"], update_radar._digest(item), check, state)
+            before = state.read_bytes()
+            for prerequisites, needs_recheck, reason in (
+                (check["prerequisites"], False, "prerequisites-unchanged"),
+                ({**check["prerequisites"], "unrelated": "new"}, False, "prerequisites-unchanged"),
+                ({**check["prerequisites"], "cli-version": "test-2"}, True, "prerequisites-changed"),
+                ({"cli-version": "test-1"}, True, "prerequisites-missing"),
+                (None, True, "prerequisites-unknown"),
+            ):
+                with self.subTest(reason=reason):
+                    result = update_radar.pending(state, prerequisites)
+                    self.assertEqual(needs_recheck, result["pending"][0]["needsRecheck"])
+                    self.assertEqual(reason, result["pending"][0]["recheckReason"])
+                    self.assertEqual(int(needs_recheck), result["needsRecheckCount"])
+                    self.assertEqual(int(not needs_recheck), result["deferredCount"])
+                    self.assertEqual(1, result["pendingCount"])
+            self.assertEqual(before, state.read_bytes())
+
+    def test_invalid_assessment_never_changes_state(self):
+        item = candidate(); digest = update_radar._digest(item)
+        invalid = ([], assessment(extra=True), assessment(schemaVersion=True), assessment(schemaVersion=1.0),
+                   assessment(evidence=[]), assessment(evidence=["same", "same"]),
+                   assessment(evidence=["x"] * 9), assessment(evidence=["bad\x00text"]),
+                   assessment(blocker=""), assessment(blocker="x" * 501), assessment(recheckWhen="multi\nline"),
+                   assessment(prerequisites={}), assessment(prerequisites={"Bad key": "x"}),
+                   assessment(prerequisites={"feature": False}), assessment(prerequisites={"feature": " unknown"}),
+                   assessment(prerequisites={str(index): "x" for index in range(17)}))
+        with workspace_state() as state:
+            update_radar.scan(batch(item), state)
+            before = state.read_bytes()
+            for check in invalid:
+                with self.subTest(check=check), self.assertRaises(update_radar.RadarError):
+                    update_radar.defer(item["id"], digest, check, state)
+                self.assertEqual(before, state.read_bytes())
+
+    def test_defer_requires_matching_actionable_unresolved_history(self):
+        item = candidate(); digest = update_radar._digest(item)
+        ignored = candidate("ignored", {"security": 0, "compatibility": 0, "userTime": 0,
+                                        "reliability": 0, "implementationCost": 0})
+        with workspace_state() as state:
+            update_radar.scan(batch(item, ignored), state)
+            before = state.read_bytes()
+            for identifier, supplied in (("missing", digest), (item["id"], "0" * 64),
+                                         (item["id"], []), ("Bad id", digest),
+                                         (ignored["id"], update_radar._digest(ignored))):
+                with self.assertRaises(update_radar.RadarError):
+                    update_radar.defer(identifier, supplied, assessment(), state)
+                self.assertEqual(before, state.read_bytes())
+            update_radar.resolve(item["id"], digest, "no-benefit", "1" * 64, state)
+            before = state.read_bytes()
+            with self.assertRaises(update_radar.RadarError):
+                update_radar.defer(item["id"], digest, assessment(), state)
+            self.assertEqual(before, state.read_bytes())
+
+    def test_checkpoint_history_is_bounded_without_silent_truncation(self):
+        item = candidate(); digest = update_radar._digest(item)
+        first = assessment(); second = assessment(blocker="Another observed blocker.")
+        with workspace_state() as state:
+            update_radar.scan(batch(item), state)
+            with patch.object(update_radar, "MAX_ASSESSMENTS", 2):
+                update_radar.defer(item["id"], digest, first, state)
+                update_radar.defer(item["id"], digest, second, state)
+                before = state.read_bytes()
+                self.assertFalse(update_radar.defer(item["id"], digest, second, state)["stateChanged"])
+                with self.assertRaises(update_radar.RadarError):
+                    update_radar.defer(item["id"], digest, assessment(blocker="Third blocker."), state)
+                self.assertEqual(before, state.read_bytes())
+                self.assertEqual([first, second], json.loads(state.read_text())["evaluations"][item["id"]]["assessments"])
+
+    def test_v2_reads_without_migration_and_exact_replay_recovers_only_missing_facts(self):
+        item = candidate(); digest = update_radar._digest(item)
+        previous = {"outcome": "no-benefit", "evidenceHash": "1" * 64}
+        legacy = {"schemaVersion": 2, "seen": {item["id"]: digest, "final": "2" * 64, "unknown": "3" * 64},
+                  "evaluations": {item["id"]: {"classification": "evaluate", "resolution": None},
+                                  "final": {"classification": "significant", "resolution": previous}}}
+        with workspace_state() as state:
+            state.write_text(json.dumps(legacy), encoding="utf-8")
+            before = state.read_bytes()
+            result = update_radar.pending(state)
+            self.assertIsNone(result["pending"][0]["candidate"])
+            self.assertEqual(1, result["unknownEvaluationCount"])
+            self.assertFalse(update_radar.scan(batch(), state)["stateChanged"])
+            self.assertEqual(before, state.read_bytes())
+            replay = update_radar.scan(batch(item), state)
+            self.assertTrue(replay["stateChanged"])
+            self.assertEqual([], replay["candidates"])
+            self.assertEqual(item, replay["pending"][0]["candidate"])
+            saved = json.loads(state.read_text())
+            self.assertEqual(3, saved["schemaVersion"])
+            self.assertEqual(previous, {key: saved["evaluations"]["final"]["resolution"][key] for key in previous})
+            self.assertEqual("3" * 64, saved["seen"]["unknown"])
+            self.assertNotIn("unknown", saved["evaluations"])
+            before = state.read_bytes()
+            self.assertFalse(update_radar.scan(batch(item), state)["stateChanged"])
+            self.assertEqual(before, state.read_bytes())
+
+    def test_v3_corruption_fails_closed_without_reclassification(self):
+        item = candidate(); identifier = item["id"]
+        with workspace_state() as state:
+            update_radar.scan(batch(item), state)
+            valid = json.loads(state.read_text())
+            malformed = []
+            for field, value in (("candidate", candidate("wrong-id")), ("candidate", {**item, "facts": ["Changed"]}),
+                                 ("candidate", {}), ("assessments", [assessment(blocker="")]),
+                                 ("assessments", [assessment()] * (update_radar.MAX_ASSESSMENTS + 1)),
+                                 ("resolution", {"outcome": "useful", "evidenceHash": "1" * 64, "evidence": []})):
+                changed = copy.deepcopy(valid); changed["evaluations"][identifier][field] = value
+                malformed.append(changed)
+            malformed.extend({**valid, "schemaVersion": version} for version in (True, 3.0, 4))
+            changed = copy.deepcopy(valid); changed["evaluations"][identifier]["extra"] = True
+            malformed.append(changed)
+            for corrupted in malformed:
+                state.write_text(json.dumps(corrupted), encoding="utf-8")
+                before = state.read_bytes()
+                with self.assertRaises(update_radar.RadarError):
+                    update_radar.pending(state)
+                self.assertEqual(before, state.read_bytes())
+            state.write_text(json.dumps(valid), encoding="utf-8")
+            with patch.object(update_radar.update_impact, "classify", side_effect=AssertionError("must not reclassify")):
+                self.assertEqual(1, update_radar.pending(state)["pendingCount"])
+
+    def test_duplicate_json_fields_fail_closed_for_state_and_batch(self):
+        with workspace_state() as state:
+            for payload in ('{"schemaVersion":1,"seen":{},"seen":{}}',
+                            '{"schemaVersion":1,"candidates":[],"candidates":[]}'):
+                state.write_text(payload, encoding="utf-8")
+                before = state.read_bytes()
+                with self.assertRaises(update_radar.RadarError):
+                    update_radar.pending(state)
+                with self.assertRaises(update_radar.RadarError):
+                    update_radar._read_batch(state)
+                self.assertEqual(before, state.read_bytes())
+
+    def test_resolution_retains_bounded_evidence_and_does_not_rewrite_it(self):
+        item = candidate(); digest = update_radar._digest(item)
+        evidence = ["Command: existing local regression test.", "Observed: route is not used; no change applied."]
+        with workspace_state() as state:
+            update_radar.scan(batch(item), state)
+            update_radar.defer(item["id"], digest, assessment(), state)
+            for invalid in ([], ["bad\ntext"], ["x"] * 9, "not-a-list"):
+                before = state.read_bytes()
+                with self.assertRaises(update_radar.RadarError):
+                    update_radar.resolve(item["id"], digest, "no-benefit", "1" * 64, state, evidence=invalid)
+                self.assertEqual(before, state.read_bytes())
+            result = update_radar.resolve(item["id"], digest, "no-benefit", "1" * 64, state, evidence=evidence)
+            before = state.read_bytes()
+            retry = update_radar.resolve(item["id"], digest, "no-benefit", "1" * 64, state, evidence=evidence)
+            self.assertTrue(result["stateChanged"])
+            self.assertFalse(retry["stateChanged"])
+            saved = json.loads(state.read_text())["evaluations"][item["id"]]
+            self.assertEqual(evidence, saved["resolution"]["evidence"])
+            self.assertEqual([assessment()], saved["assessments"])
+            with self.assertRaises(update_radar.RadarError):
+                update_radar.resolve(item["id"], digest, "no-benefit", "1" * 64, state, evidence=["Different evidence."])
+            self.assertEqual(before, state.read_bytes())
+
+    def test_checkpoint_atomic_failure_and_size_limit_preserve_history(self):
+        item = candidate(); digest = update_radar._digest(item)
+        with workspace_state() as state:
+            update_radar.scan(batch(item), state)
+            before = state.read_bytes()
+            with patch.object(update_radar.os, "replace", side_effect=OSError("simulated")):
+                with self.assertRaises(OSError):
+                    update_radar.defer(item["id"], digest, assessment(), state)
+            self.assertEqual(before, state.read_bytes())
+            self.assertEqual([], list(TEST_TMP.glob(f".{state.name}.*.tmp")))
+            with patch.object(update_radar, "MAX_INPUT_BYTES", len(before) + 1):
+                with self.assertRaises(update_radar.RadarError):
+                    update_radar.defer(item["id"], digest, assessment(), state)
+            self.assertEqual(before, state.read_bytes())
+
+    def test_pending_is_read_only_and_rejects_invalid_prerequisites(self):
+        with workspace_state() as state:
+            self.assertEqual(0, update_radar.pending(state)["pendingCount"])
+            self.assertFalse(state.exists())
+            for invalid in ({}, [], {"feature": None}, {"feature": "line\nline"}):
+                with self.assertRaises(update_radar.RadarError):
+                    update_radar.pending(state, invalid)
+                self.assertFalse(state.exists())
+
+    def test_pending_defer_and_evidence_cli_are_canonical_and_fail_closed(self):
+        repo = Path(__file__).parents[1]
+        state = repo / ".harness" / "runtime" / f"test-update-radar-state-{uuid4().hex}.json"
+        item = candidate(); digest = update_radar._digest(item); check = assessment()
+        def cli(*args, input_text=None):
+            return subprocess.run([sys.executable, "update_radar.py", *args, "--state", str(state)],
+                                  cwd=repo, input=input_text, text=True, encoding="utf-8",
+                                  capture_output=True, check=False, timeout=15)
+        try:
+            update_radar.scan(batch(item), state)
+            deferred = cli("defer", item["id"], "--digest", digest, "--assessment-json", json.dumps(check))
+            self.assertEqual(0, deferred.returncode, deferred.stderr)
+            before = state.read_bytes()
+            pending = cli("pending", "--prerequisites-json", json.dumps(check["prerequisites"]))
+            self.assertEqual(0, pending.returncode, pending.stderr)
+            self.assertEqual(0, json.loads(pending.stdout)["needsRecheckCount"])
+            self.assertEqual(pending.stdout, json.dumps(json.loads(pending.stdout), ensure_ascii=True,
+                                                      sort_keys=True, separators=(",", ":")) + "\n")
+            stdin_retry = cli("defer", item["id"], "--digest", digest, "--assessment-json", "-",
+                              input_text="\ufeff" + json.dumps(check))
+            self.assertEqual(0, stdin_retry.returncode, stdin_retry.stderr)
+            self.assertFalse(json.loads(stdin_retry.stdout)["stateChanged"])
+            stdin_pending = cli("pending", "--prerequisites-json", "-", input_text=json.dumps(check["prerequisites"]))
+            self.assertEqual(pending.stdout, stdin_pending.stdout)
+            for oversized_payload in (" " * (update_radar.MAX_INPUT_BYTES + 1),
+                                      "\ufeff" + json.dumps(check) + " " * update_radar.MAX_INPUT_BYTES):
+                oversized = cli("defer", item["id"], "--digest", digest, "--assessment-json", "-",
+                                input_text=oversized_payload)
+                self.assertEqual(2, oversized.returncode)
+                self.assertEqual(before, state.read_bytes())
+            for args in (("defer", item["id"], "--digest", digest, "--assessment-json", "{}"),
+                         ("pending", "--prerequisites-json", '{"feature":"a","feature":"b"}'),
+                         ("pending", "--prerequisites-json", "["),
+                         ("pending", "--prerequisites-json", "[" * 1100 + "0" + "]" * 1100),
+                         ("pending", "--state", str(repo / "escaped.json"))):
+                # Pass an unsafe state last, so argparse cannot override it with the fixture path.
+                result = (subprocess.run([sys.executable, "update_radar.py", *args], cwd=repo, text=True,
+                                         capture_output=True, check=False, timeout=15)
+                          if "--state" in args else cli(*args))
+                self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
+                self.assertEqual(before, state.read_bytes())
+            resolved = cli("resolve", item["id"], "--digest", digest, "--outcome", "no-benefit",
+                           "--evidence-hash", "1" * 64, "--evidence-json", "-",
+                           input_text=json.dumps(["Локальная проверка пройдена."], ensure_ascii=False))
+            self.assertEqual(0, resolved.returncode, resolved.stderr)
+            self.assertEqual(["Локальная проверка пройдена."], json.loads(resolved.stdout)["evidence"])
+        finally:
+            state.unlink(missing_ok=True)
 
     def test_cli_is_canonical_and_restricts_state_to_runtime_directory(self):
         repo = Path(__file__).parents[1]

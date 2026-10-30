@@ -1,7 +1,18 @@
 # Контекст проекта «Харнес разработка»
 
 <!-- context-handoff:start -->
-## Current handoff
+## Current integration — unified local release (2026-10-29, Europe/Minsk)
+
+- Worktree: publication branch `codex/gpt61-terra-harness`; implementation baseline `1fe22aa0694cce1b9d7e1ba6cb967fdde5a38761`. Canonical card: `.harness/work/unified-release-20261029.md`. Read the current Git commit/ref rather than treating the implementation baseline as the latest revision.
+- Candidate `2026.10.29-unified.local.1`: exact22, bundle `a42837114f5ecc1cddb7565fafbcfaf747d2a0657f1ba8c6713c0aa04206bf2b`. Includes existing native usage CLI/dependencies, schema3 metrics, exact18 upgrade protection, raw-byte Git portability, and durable radar candidate/evidence/blocker/recheck checkpoints. Terra validation/dispatch and previous strict boolean regression are preserved.
+- Scope deliberately excludes source checkout's Goal signature index, separate evaluation framework, unrelated process/template changes, live state migration, global config/roles and scheduler. Original `D:/6 Проекты/Харнес разработка` remains unchanged. Only the dependency auditor's report-only explanation was added to ENGINEERING_LOOP.
+- Fresh checks: prechange191 (35.1788s), targeted133 (32.3859s), Strict postchange240 (43.6016s), Strict release240 + installer lifecycle (83.0192s) PASS. Six disposable lifecycle scenarios PASS in6.9038s, including installed CLI6/6, isolated imports, real exact18→22 upgrade, protected owner files, no-op/conflicts, and installed radar v2 read-only→v3 checkpoints with UTF8 BOM stdin. Six changed Markdown files audited: no broken local links; only two code-fence duplicate groups. See runtime receipts rather than treating this note as independent attestation.
+- Prior bounded native A/B completed2/2 with synthetic input and real module snapshots: both6/6 functional, no speed/token benefit demonstrated. This does not resume or complete the older12-trial pilot. Existing CLI separately passed6/6 and a current-session bounded numeric read; not whole-session billing or production quality evidence. Receipts: `.harness/runtime/harness-ab-20261029/summary.json`.
+- Protected worktree AGENTS SHA `9ec07818b94dbdda4700e50fd873b8130c985c070a5ff81b0249065efd43c723`; source AGENTS SHA `e8076dfe7175776c71b8fb1017a5cda7acf9eec9f4ea9d673b1c5ae248fb0a0c`. Source payload/tests and the earlier boolean test/card are protected by35 fresh hashes in `.harness/runtime/unified-release-20261029/baseline.json`.
+- Implementation completed without real-project adoption, ERP writes, new model calls or fleet update. On2026-10-30 the user separately authorized commit and push of this exact release to `aidzmitry-gif/harnes-codex`, preserving AGENTS.md. Publication targets only `codex/gpt61-terra-harness`, not main; verify its current remote SHA and the ignored publication receipt. Runtime evidence stays local. Actual adoption still requires target instructions, fresh plan/conflicts and confirmed idle. Original source and earlier changes were not overwritten.
+- Startup pointers: canonical card, `harness-release.json`, `docs/DISTRIBUTION.md`, `docs/LOCAL_USAGE.md`, `templates/update-radar-task.md`. Evidence directory: `.harness/runtime/unified-release-20261029/`. Previous distribution inventory below is historical, not refreshed today.
+
+## Previous HRE-006 handoff (historical)
 
 - Updated: 2026-09-05, Europe/Istanbul; сверять с git и текущими receipts.
 - Objective: HRE-006 — доставить проверенный Harness в зарегистрированные доступные проекты, сохранив локальные правила и данные.

@@ -184,8 +184,8 @@ def validate_passport(passport: object) -> list[tuple[str, str]]:
                 suffix=".jsonl",
             )
         schema = chain.get("metricsSchemaVersion")
-        if isinstance(schema, bool) or not isinstance(schema, int) or schema not in (1, 2):
-            fail("CHAIN_CONTINUITY", "chain.metricsSchemaVersion must be integer 1 or 2")
+        if isinstance(schema, bool) or not isinstance(schema, int) or schema not in (1, 2, 3):
+            fail("CHAIN_CONTINUITY", "chain.metricsSchemaVersion must be integer 1, 2 or 3")
 
     by_id: dict[str, dict] = {}
     for index, raw in enumerate(subgoals):

@@ -1,19 +1,23 @@
 # Exact release payload: raw-byte hashes must survive Windows Git checkout.
-acceptance_gate.py text eol=lf
-goal_runner_validator.py text eol=lf
-goal_orchestrator.py text eol=lf
-goal_progress.py text eol=lf
-harness_metrics.py text eol=lf
-harness_benchmark.py text eol=lf
-update_impact.py text eol=lf
-update_radar.py text eol=lf
-scripts/Invoke-HarnessGate.ps1 text eol=lf
-docs/ENGINEERING_LOOP.md text eol=lf
-templates/work-item.md text eol=lf
-templates/acceptance.example.json text eol=lf
-templates/goal-passport.example.json text eol=lf
-templates/project-profile.example.json text eol=lf
-templates/update-radar-task.md text eol=lf
-templates/update-candidate.example.json text eol=lf
-templates/update-batch.example.json text eol=lf
-tests/fixtures/hre-001-benchmark.json text eol=lf
+acceptance_gate.py -text
+goal_runner_validator.py -text
+goal_orchestrator.py -text
+goal_progress.py -text
+harness_metrics.py -text
+harness_codex.py -text
+harness_instruction_audit.py -text
+harness_distribution.py -text
+harness_benchmark.py -text
+update_impact.py -text
+update_radar.py -text
+scripts/Invoke-HarnessGate.ps1 -text
+docs/ENGINEERING_LOOP.md -text
+docs/LOCAL_USAGE.md -text
+templates/work-item.md -text
+templates/acceptance.example.json -text
+templates/goal-passport.example.json -text
+templates/project-profile.example.json -text
+templates/update-radar-task.md -text
+templates/update-candidate.example.json -text
+templates/update-batch.example.json -text
+tests/fixtures/hre-001-benchmark.json -text

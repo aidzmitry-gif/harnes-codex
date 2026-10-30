@@ -6,7 +6,7 @@
 
 ## Что распространяется
 
-`harness_distribution.py` управляет только фиксированными 18 core-файлами:
+`harness_distribution.py` управляет только фиксированными 22 core-файлами:
 Python validators/planner/radar/metrics, gate, инженерный loop и шаблоны.
 Python-модули копируются в корень проекта: `acceptance_gate.root()` вычисляется
 по расположению файла. Ссылка на центральный Python helper направила бы evidence
@@ -62,8 +62,13 @@ aggregate bundleHash. Это проверка целостности, не кр�
 источник разрешения: доверять нужно проверенному release commit в вашем репозитории.
 Автор выпуска получает JSON через `release --source <absolute-root> --version <id>`;
 после изменения любого managed файла manifest обновляется и проверяется заново.
-В source checkout `.gitattributes` закрепляет LF только для этих 18 файлов;
-иначе Windows `core.autocrlf` изменил бы байты после клонирования и нарушил хеши.
+В source checkout `.gitattributes` задаёт `-text` только для этих 22 файлов:
+Git не нормализует их окончания строк при добавлении и checkout, поэтому raw-byte
+manifest сохраняет смысл даже для уже существующего файла со смешанными LF/CRLF.
+Не заменяйте это на `text eol=lf`: оно меняет такие байты и нарушает хеши.
+Regression проверяет реальные payload и manifest через Git add/checkout-index
+при `core.autocrlf=true` и `false`, затем fresh install/verify всех 22 файлов.
+Это локальная проверка переносимости, не подтверждение публикации commit/tag.
 Настройки Git целевого проекта не переписываются: если его последующий checkout
 преобразует managed файлы в CRLF, следующий preview обнаружит конфликт, а не
 молча примет изменённые байты.

@@ -371,6 +371,17 @@ class BudgetGuardTests(unittest.TestCase):
                 self.passport["chain"]["runBudget"][field] = observed - 1
                 self.assertEqual(reasons[field], self.actions()[0]["reason"])
 
+    def test_schema3_usage_reaches_existing_budget_guard_without_counting_subsets_twice(self):
+        value = dict(self.record())
+        value.pop('schemaVersion')
+        value.pop('recordedAt')
+        value.update(cachedInputTokens=8, reasoningOutputTokens=3)
+        self.write_records(harness_metrics.normalize_event(value))
+        self.passport['chain']['metricsSchemaVersion'] = 3
+        self.assertEqual('launch', self.actions()[0]['action'])
+        self.passport['chain']['runBudget']['maxTokens'] = 15
+        self.assertEqual('budget_max_tokens_reached', self.actions()[0]['reason'])
+
     def test_unknown_legacy_duplicate_foreign_and_unavailable_evidence_hold(self):
         cases = [
             (self.record(input_tokens=None, output_tokens=None),),

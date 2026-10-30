@@ -19,7 +19,7 @@ import sys
 import tempfile
 import uuid
 
-FILES = (
+LEGACY_FILES = (
     "acceptance_gate.py", "goal_runner_validator.py", "goal_orchestrator.py",
     "goal_progress.py", "harness_metrics.py", "harness_benchmark.py",
     "update_impact.py", "update_radar.py", "scripts/Invoke-HarnessGate.ps1",
@@ -29,6 +29,7 @@ FILES = (
     "templates/update-candidate.example.json", "templates/update-batch.example.json",
     "tests/fixtures/hre-001-benchmark.json",
 )
+FILES = (*LEGACY_FILES, "harness_codex.py", "harness_instruction_audit.py", "harness_distribution.py", "docs/LOCAL_USAGE.md")
 RELEASE = "harness-release.json"
 RECEIPT = ".harness/distribution.json"
 LOCK = ".harness/.distribution-lock"
@@ -148,7 +149,7 @@ def load_registry(path):
     return value
 
 
-def validate_manifest(value):
+def validate_manifest(value, *, allow_legacy=False):
     if not isinstance(value, dict) or set(value) != {"schemaVersion", "releaseId", "files", "bundleHash"}:
         raise DistributionError("invalid manifest fields")
     if type(value["schemaVersion"]) is not int or value["schemaVersion"] != 1:
@@ -156,7 +157,8 @@ def validate_manifest(value):
     if not isinstance(value["releaseId"], str) or not VERSION.fullmatch(value["releaseId"]):
         raise DistributionError("invalid release ID")
     hashes = value["files"]
-    if not isinstance(hashes, dict) or set(hashes) != set(FILES):
+    allowed_sets = (set(FILES), set(LEGACY_FILES)) if allow_legacy else (set(FILES),)
+    if not isinstance(hashes, dict) or set(hashes) not in allowed_sets:
         raise DistributionError("manifest must contain exactly the fixed managed file list")
     if any(not isinstance(v, str) or not HEX.fullmatch(v) for v in hashes.values()):
         raise DistributionError("invalid file hash")
@@ -200,18 +202,19 @@ def inspect(source, project):
         raise DistributionError("installation lock exists; inspect interrupted/active transaction")
     manifest, payload = load_release(source)
     before = snapshot(project)
-    prior = validate_manifest(parse(before[RECEIPT])) if before[RECEIPT] is not None else None
+    prior = validate_manifest(parse(before[RECEIPT]), allow_legacy=True) if before[RECEIPT] is not None else None
     rows = []
     for name in FILES:
         actual = digest(before[name]) if before[name] is not None else None
         wanted = manifest["files"][name]
-        if prior is not None and actual != prior["files"][name]:
+        managed = prior is not None and name in prior["files"]
+        if managed and actual != prior["files"][name]:
             action = "conflict"
         elif actual == wanted:
             action = "unchanged"
         elif actual is None:
             action = "create"
-        elif prior is not None:
+        elif managed:
             action = "update"
         else:
             action = "conflict"
@@ -241,14 +244,14 @@ def atomic_write(path, content):
 
 def verify(project, expected=None):
     project = checked_root(project)
-    installed = validate_manifest(parse(read_bytes(safe_path(project, RECEIPT))))
-    mismatches = [name for name in FILES if digest(read_bytes(safe_path(project, name))) != installed["files"][name]]
+    installed = validate_manifest(parse(read_bytes(safe_path(project, RECEIPT))), allow_legacy=True)
+    mismatches = [name for name in installed["files"] if digest(read_bytes(safe_path(project, name))) != installed["files"][name]]
     if expected is not None and installed != expected:
         mismatches.append(RECEIPT)
     if mismatches:
         raise DistributionError("installed content mismatch: " + ", ".join(mismatches))
     return {"status": "verified", "project": str(project), "releaseId": installed["releaseId"],
-            "bundleHash": installed["bundleHash"], "verifiedFiles": len(FILES),
+            "bundleHash": installed["bundleHash"], "verifiedFiles": len(installed["files"]),
             "profileConfigured": (project / "harness.config.json").is_file(),
             "projectAcceptance": "not-run"}
 

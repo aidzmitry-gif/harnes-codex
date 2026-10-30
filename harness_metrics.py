@@ -18,8 +18,13 @@ from typing import Any
 SCHEMA_VERSION = 1
 # Version 2 adds explicit failed attempts. Keep old producers and rows readable.
 FAILURE_SCHEMA_VERSION = 2
+SESSION_SCHEMA_VERSION = 3
+SESSION_FIELDS = {'cachedInputTokens', 'reasoningOutputTokens', 'usageWindow'}
+USAGE_COUNTER_FIELDS = {'input_tokens', 'cached_input_tokens', 'output_tokens',
+                        'reasoning_output_tokens', 'total_tokens'}
 # ponytail: measured at 50,000 pair keys (1.763 s / 54.06 MiB); above this archive JSONL or add a SQLite index.
 MAX_COMPARE_PAIR_KEYS = 50_000
+SHA256_PATTERN = re.compile(r"^[A-Fa-f0-9]{64}$")
 EVENT_FIELDS = (
     "runId", "pairKey", "chainId", "subgoalId", "treatment", "mode", "model",
     "reasoningEffort", "inputTokens", "outputTokens", "durationMs", "attempts",
@@ -48,11 +53,42 @@ def _fail(message: str) -> None:
     raise ValueError(message)
 
 
+def validate_cumulative_usage(value: Any) -> dict[str, int]:
+    if not isinstance(value, dict) or set(value) != USAGE_COUNTER_FIELDS:
+        _fail('invalid cumulative usage fields')
+    if any(type(count) is not int or not 0 <= count <= 2**63 - 1 for count in value.values()):
+        _fail('invalid cumulative usage counter')
+    if value['cached_input_tokens'] > value['input_tokens'] or value['reasoning_output_tokens'] > value['output_tokens']:
+        _fail('cumulative usage subset exceeds total')
+    if value['total_tokens'] != value['input_tokens'] + value['output_tokens']:
+        _fail('invalid cumulative usage total')
+    return value
+
+
+def validate_usage_window(value: Any) -> dict[str, Any]:
+    fields = {'sessionId', 'sourceId', 'startOffset', 'endOffset', 'endAnchorSha256', 'startUsage', 'endUsage'}
+    if not isinstance(value, dict) or set(value) != fields:
+        _fail('invalid usage window fields')
+    if not isinstance(value['sessionId'], str) or not re.fullmatch(r'[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}', value['sessionId']):
+        _fail('invalid session ID')
+    if any(type(value[field]) is not int or not 0 <= value[field] <= 2**63 - 1 for field in ('startOffset', 'endOffset')):
+        _fail('invalid usage offsets')
+    if value['endOffset'] <= value['startOffset']:
+        _fail('usage window must advance')
+    for field in ('sourceId', 'endAnchorSha256'):
+        if not isinstance(value[field], str) or not SHA256_PATTERN.fullmatch(value[field]):
+            _fail('invalid usage anchor or source ID')
+    before, after = validate_cumulative_usage(value['startUsage']), validate_cumulative_usage(value['endUsage'])
+    delta = {field: after[field] - before[field] for field in USAGE_COUNTER_FIELDS}
+    validate_cumulative_usage(delta)
+    return value
+
+
 def validate_event(event: Any) -> dict[str, Any]:
     """Return a complete normalized event or reject untrusted event input."""
     if not isinstance(event, dict):
         _fail("event must be a JSON object")
-    extra = set(event) - set(EVENT_FIELDS)
+    extra = set(event) - set(EVENT_FIELDS) - SESSION_FIELDS
     if extra:
         _fail("unknown event fields: " + ", ".join(sorted(extra)))
     missing = REQUIRED_FIELDS - set(event)
@@ -88,12 +124,26 @@ def validate_event(event: Any) -> dict[str, Any]:
             _fail(f"{field} must be boolean" + (" or null" if field in ("released", "used") else ""))
     if normalized["used"] is True and normalized["released"] is not True:
         _fail("used=true requires released=true")
+    if SESSION_FIELDS & set(event):
+        for field, total in (('cachedInputTokens', 'inputTokens'), ('reasoningOutputTokens', 'outputTokens')):
+            value = event.get(field)
+            if value is not None and (type(value) is not int or value < 0 or normalized[total] is None or value > normalized[total]):
+                _fail('invalid usage subset counter')
+            normalized[field] = value
+        window = event.get('usageWindow')
+        if window is not None:
+            validate_usage_window(window)
+            for field, source in (('inputTokens', 'input_tokens'), ('outputTokens', 'output_tokens'),
+                                  ('cachedInputTokens', 'cached_input_tokens'), ('reasoningOutputTokens', 'reasoning_output_tokens')):
+                if normalized[field] != window['endUsage'][source] - window['startUsage'][source]:
+                    _fail('usage delta does not match checkpoint')
+        normalized['usageWindow'] = window
     return normalized
 
 
 def normalize_event(event: Any, recorded_at: str | None = None) -> dict[str, Any]:
     normalized = validate_event(event)
-    version = FAILURE_SCHEMA_VERSION if 'failedAttempts' in event else SCHEMA_VERSION
+    version = SESSION_SCHEMA_VERSION if SESSION_FIELDS & set(event) else FAILURE_SCHEMA_VERSION if 'failedAttempts' in event else SCHEMA_VERSION
     if version == SCHEMA_VERSION:
         normalized.pop('failedAttempts')
     timestamp = recorded_at or datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -104,9 +154,9 @@ def validate_record(record: Any) -> dict[str, Any]:
     if not isinstance(record, dict):
         _fail("record has an invalid schema")
     version = record.get('schemaVersion')
-    if isinstance(version, bool) or not isinstance(version, int) or version not in (SCHEMA_VERSION, FAILURE_SCHEMA_VERSION):
+    if isinstance(version, bool) or not isinstance(version, int) or version not in (SCHEMA_VERSION, FAILURE_SCHEMA_VERSION, SESSION_SCHEMA_VERSION):
         _fail("unsupported schemaVersion")
-    expected = LEGACY_RECORD_FIELDS if version == SCHEMA_VERSION else set(RECORD_FIELDS)
+    expected = LEGACY_RECORD_FIELDS if version == SCHEMA_VERSION else set(RECORD_FIELDS) | (SESSION_FIELDS if version == SESSION_SCHEMA_VERSION else set())
     if set(record) != expected:
         _fail('record has an invalid schema')
     timestamp = record["recordedAt"]
@@ -118,7 +168,7 @@ def validate_record(record: Any) -> dict[str, Any]:
         raise ValueError("recordedAt must be a UTC timestamp") from exc
     if parsed.tzinfo is None or parsed.utcoffset() != UTC.utcoffset(parsed):
         _fail("recordedAt must be UTC")
-    validate_event({field: record[field] for field in EVENT_FIELDS if field in record})
+    validate_event({field: record[field] for field in (*EVENT_FIELDS, *SESSION_FIELDS) if field in record})
     return record
 
 
@@ -166,6 +216,8 @@ def task_summary(records: Iterable[dict[str, Any]], chain_id: str) -> dict[str, 
         _fail('chain must be a bounded identifier')
     seen: set[str] = set()
     tokens = failures = known_tokens = known_failures = attempts = 0
+    cached = reasoning = known_cached = known_reasoning = 0
+    windows: dict[str, int] = {}
     for record in records:
         validate_record(record)
         if record['chainId'] != chain_id:
@@ -175,6 +227,14 @@ def task_summary(records: Iterable[dict[str, Any]], chain_id: str) -> dict[str, 
         if len(seen) >= MAX_COMPARE_PAIR_KEYS:
             _fail('task telemetry exceeds bounded run limit; archive completed runs')
         seen.add(record['runId'])
+        window = record.get('usageWindow')
+        if window is not None:
+            if windows and window['sessionId'] not in windows:
+                _fail('multiple native sessions require verified independent aggregation; use separate ledgers')
+            prior_end = windows.get(window['sessionId'], 0)
+            if window['startOffset'] < prior_end:
+                _fail('overlapping session usage windows')
+            windows[window['sessionId']] = window['endOffset']
         attempts += record['attempts']
         if record['inputTokens'] is not None:
             tokens += record['inputTokens'] + record['outputTokens']
@@ -182,6 +242,12 @@ def task_summary(records: Iterable[dict[str, Any]], chain_id: str) -> dict[str, 
         if record.get('failedAttempts') is not None:
             failures += record['failedAttempts']
             known_failures += 1
+        if record.get('cachedInputTokens') is not None:
+            cached += record['cachedInputTokens']
+            known_cached += 1
+        if record.get('reasoningOutputTokens') is not None:
+            reasoning += record['reasoningOutputTokens']
+            known_reasoning += 1
     runs = len(seen)
 
     def coverage(subtotal: int, known: int) -> dict[str, Any]:
@@ -192,6 +258,8 @@ def task_summary(records: Iterable[dict[str, Any]], chain_id: str) -> dict[str, 
     return {'chainId': chain_id, 'runs': runs, 'attempts': attempts,
             'scope': 'recorded-run-deltas-only',
             'tokens': coverage(tokens, known_tokens),
+            'cachedInputTokens': coverage(cached, known_cached),
+            'reasoningOutputTokens': coverage(reasoning, known_reasoning),
             'failedAttempts': coverage(failures, known_failures)}
 
 
@@ -218,6 +286,7 @@ def acceptance_progress(work_item: str) -> dict[str, Any]:
 def summary(records: Iterable[dict[str, Any]]) -> dict[str, Any]:
     runs = accepted = attempts = checks_failed = checks_passed = defects = rework = duration = 0
     token_known = token_input = token_output = 0
+    cached_known = cached_total = reasoning_known = reasoning_total = 0
     release_known = released = usage_known = used = 0
     for record in records:
         runs += 1
@@ -232,6 +301,12 @@ def summary(records: Iterable[dict[str, Any]]) -> dict[str, Any]:
             token_known += 1
             token_input += record["inputTokens"]
             token_output += record["outputTokens"]
+        if record.get('cachedInputTokens') is not None:
+            cached_known += 1
+            cached_total += record['cachedInputTokens']
+        if record.get('reasoningOutputTokens') is not None:
+            reasoning_known += 1
+            reasoning_total += record['reasoningOutputTokens']
         if record["released"] is not None:
             release_known += 1
             released += int(record["released"])
@@ -254,6 +329,10 @@ def summary(records: Iterable[dict[str, Any]]) -> dict[str, Any]:
             "knownRuns": token_known,
             "output": token_output if token_known else None,
             "total": token_input + token_output if token_known else None,
+            "cachedInput": cached_total if cached_known else None,
+            "cachedKnownRuns": cached_known,
+            "reasoningOutput": reasoning_total if reasoning_known else None,
+            "reasoningKnownRuns": reasoning_known,
         },
         "usage": {"known": usage_known, "rate": used / usage_known if usage_known else None, "used": used},
     }
@@ -265,8 +344,11 @@ def _mean_delta(pairs: list[tuple[dict[str, Any], dict[str, Any]]], field: str, 
         if field == "knownTotalTokens":
             before = None if baseline["inputTokens"] is None else baseline["inputTokens"] + baseline["outputTokens"]
             after = None if treatment["inputTokens"] is None else treatment["inputTokens"] + treatment["outputTokens"]
+        elif field == 'uncachedInputTokens':
+            before = None if baseline.get('cachedInputTokens') is None else baseline['inputTokens'] - baseline['cachedInputTokens']
+            after = None if treatment.get('cachedInputTokens') is None else treatment['inputTokens'] - treatment['cachedInputTokens']
         else:
-            before, after = baseline[field], treatment[field]
+            before, after = baseline.get(field), treatment.get(field)
         if optional and (before is None or after is None):
             continue
         values.append(float(after) - float(before))
@@ -306,6 +388,9 @@ def compare(records: Iterable[dict[str, Any]], baseline_id: str, treatment_id: s
             "defects": _mean_delta(pairs, "escapedDefects"),
             "durationMs": _mean_delta(pairs, "durationMs"),
             "knownTotalTokens": _mean_delta(pairs, "knownTotalTokens", optional=True),
+            "cachedInputTokens": _mean_delta(pairs, 'cachedInputTokens', optional=True),
+            "uncachedInputTokens": _mean_delta(pairs, 'uncachedInputTokens', optional=True),
+            "reasoningOutputTokens": _mean_delta(pairs, 'reasoningOutputTokens', optional=True),
             "release": _mean_delta(pairs, "released", optional=True),
             "rework": _mean_delta(pairs, "reworkCount"),
             "usage": _mean_delta(pairs, "used", optional=True),

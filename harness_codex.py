@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -23,6 +24,10 @@ MAX_EVENTS = 10_000
 MAX_METRIC_ROWS = 50_000
 MAX_RESULT_BYTES = 256_000
 MAX_SAFE_COUNTER = 10**4300 - 1
+# ponytail: 4 MiB per native checkpoint read; expand after a larger bounded replay.
+MAX_SESSION_BYTES = 4_000_000
+SESSION_ANCHOR_BYTES = 4096
+TOKEN_COUNT_MARKER = re.compile(rb'"type"\s*:\s*"token_count"')
 PROJECT_ROOT = Path(__file__).resolve().parent
 TRACE_USAGE_FIELDS = {
     "input_tokens": "inputTokens",
@@ -203,6 +208,196 @@ def _safe_evidence_reference(value: object) -> bool:
     return isinstance(value, str) and bool(EVIDENCE_REF.fullmatch(value))
 
 
+def _session_anchor(stream: Any, offset: int) -> str:
+    start = max(0, offset - SESSION_ANCHOR_BYTES)
+    stream.seek(start)
+    return hashlib.sha256(stream.read(offset - start)).hexdigest()
+
+
+def summarize_session_usage(root: str | Path, session_path: str,
+                            checkpoint: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Read a bounded native rollout slice; return only observed usage and an anchor.
+
+    Initial history before the first counter in the tail is intentionally excluded.
+    The anchor detects truncation/rotation/near-checkpoint edits, not arbitrary
+    rewrites outside that anchor. Native rollouts must be append-only trusted logs.
+    """
+    local_root = _checked_root(root)
+    relative = _validate_relative_path(session_path)
+    try:
+        target = safe_path(local_root, relative)
+        if not target.is_file():
+            raise CodexInputError('session_unavailable')
+        with target.open('rb') as stream:
+            info = os.fstat(stream.fileno())
+            header = stream.readline(MAX_LINE_BYTES + 1)
+            if len(header) > MAX_LINE_BYTES or not header.endswith(b'\n'):
+                raise CodexInputError('session_header_over_limit_or_partial')
+            metadata = _decode_json(header)
+            payload = metadata.get('payload') if isinstance(metadata, dict) else None
+            if not isinstance(metadata, dict) or metadata.get('type') != 'session_meta' or not isinstance(payload, dict):
+                raise CodexInputError('unsupported_session_header')
+            session_id = payload.get('id')
+            source_id = hashlib.sha256(os.path.normcase(str(target)).encode('utf-8')).hexdigest()
+            if not isinstance(session_id, str) or not re.fullmatch(r'[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}', session_id):
+                raise CodexInputError('invalid_session_id')
+            baseline = latest = None
+            start_offset = end_offset = None
+            bytes_read = len(header)
+            if checkpoint is not None:
+                harness_metrics.validate_usage_window(checkpoint)
+                if checkpoint['sessionId'] != session_id or checkpoint['sourceId'] != source_id or checkpoint['endOffset'] > info.st_size:
+                    raise CodexInputError('session_rotated_or_truncated')
+                if _session_anchor(stream, checkpoint['endOffset']) != checkpoint['endAnchorSha256']:
+                    raise CodexInputError('session_checkpoint_changed')
+                bytes_read += min(checkpoint['endOffset'], SESSION_ANCHOR_BYTES)
+                baseline = latest = checkpoint['endUsage']
+                start_offset = end_offset = checkpoint['endOffset']
+                position = checkpoint['endOffset']
+            else:
+                position = max(len(header), info.st_size - MAX_SESSION_BYTES)
+            stream.seek(position)
+            raw = stream.read(min(MAX_SESSION_BYTES, info.st_size - position))
+            bytes_read += len(raw)
+            has_more = position + len(raw) < info.st_size
+            if position > len(header) and checkpoint is None:
+                # A tail may start inside an arbitrary large non-usage event.
+                raw_start = raw.find(b'\n') + 1
+                if raw_start == 0:
+                    raw = b''
+                else:
+                    raw = raw[raw_start:]
+                    position += raw_start
+            last_newline = raw.rfind(b'\n')
+            raw = raw[:last_newline + 1] if last_newline >= 0 else b''
+            event_count = 0
+            cursor = position
+            for record in raw.splitlines(keepends=True):
+                cursor += len(record)
+                if not TOKEN_COUNT_MARKER.search(record):
+                    continue  # Never decode or emit chat/tool payloads.
+                if len(record) > MAX_LINE_BYTES:
+                    raise CodexInputError('session_usage_line_over_limit')
+                event = _decode_json(record)
+                payload = event.get('payload') if isinstance(event, dict) else None
+                if not isinstance(event, dict) or event.get('type') != 'event_msg' or not isinstance(payload, dict) or payload.get('type') != 'token_count':
+                    continue
+                details = payload.get('info')
+                if details is None:
+                    continue
+                if not isinstance(details, dict):
+                    raise CodexInputError('invalid_session_usage')
+                counters = details.get('total_token_usage')
+                if not isinstance(counters, dict) or set(counters) - harness_metrics.USAGE_COUNTER_FIELDS - {'cache_write_input_tokens'}:
+                    raise CodexInputError('unsupported_session_usage_fields')
+                if 'cache_write_input_tokens' in counters:
+                    written = counters['cache_write_input_tokens']
+                    total_input = counters.get('input_tokens')
+                    if type(written) is not int or type(total_input) is not int or not 0 <= written <= total_input:
+                        raise CodexInputError('invalid_session_cache_write')
+                # This observed optional subset is already inside input; no extra cost is inferred.
+                current = harness_metrics.validate_cumulative_usage({key: counters[key] for key in harness_metrics.USAGE_COUNTER_FIELDS if key in counters})
+                if latest is not None:
+                    harness_metrics.validate_cumulative_usage({key: current[key] - latest[key]
+                                                              for key in harness_metrics.USAGE_COUNTER_FIELDS})
+                event_count += 1
+                if event_count > MAX_EVENTS:
+                    raise CodexInputError('session_event_limit')
+                if baseline is None:
+                    baseline, start_offset = current, cursor
+                latest, end_offset = current, cursor
+            usage = window = None
+            if baseline is not None and latest is not None and latest['total_tokens'] > baseline['total_tokens']:
+                usage = {output: latest[source] - baseline[source] for source, output in TRACE_USAGE_FIELDS.items()}
+                usage['totalTokens'] = usage['inputTokens'] + usage['outputTokens']
+                window = {'sessionId': session_id, 'sourceId': source_id, 'startOffset': start_offset, 'endOffset': end_offset,
+                          'startUsage': baseline, 'endUsage': latest,
+                          'endAnchorSha256': _session_anchor(stream, end_offset)}
+                bytes_read += min(end_offset, SESSION_ANCHOR_BYTES)
+                harness_metrics.validate_usage_window(window)
+            if safe_path(local_root, relative).stat().st_ino != info.st_ino:
+                raise CodexInputError('session_rotated_during_read')
+    except CodexInputError:
+        raise
+    except (OSError, ValueError, TypeError, DistributionError):
+        raise CodexInputError('invalid_or_unavailable_session_usage') from None
+    return {'schemaVersion': 1, 'scope': 'single-session-observed-counter-delta',
+            'usage': usage, 'usageWindow': window, 'bytesRead': bytes_read,
+            'hasMore': has_more, 'counterEvents': event_count,
+            'unknown': ['priorHistory', 'model', 'reasoningEffort', 'durationMs', 'acceptance', 'childUsage', 'billing']}
+
+
+def record_session_usage(project_root: str | Path, event_path: str, metrics_path: str,
+                         source_root: str | Path, session_path: str) -> dict[str, Any]:
+    """Serialize cooperating importers; ledger checkpoints are the only resume state."""
+    project = _checked_root(project_root)
+    relative = _validate_relative_path(metrics_path)
+    if not relative.startswith('.harness/metrics/') or not relative.endswith('.jsonl'):
+        raise CodexInputError('invalid_metrics_path')
+    event = _decode_json(_read_bounded_file(project, event_path, MAX_RESULT_BYTES))
+    try:
+        harness_metrics.validate_event(event)
+        if event.get('inputTokens') is not None or event.get('outputTokens') is not None or harness_metrics.SESSION_FIELDS & set(event):
+            raise CodexInputError('caller_usage_must_be_unknown')
+        if event.get('chainId') is None:
+            raise CodexInputError('session_chain_binding_required')
+        ledger = safe_path(project, relative)
+        ledger.parent.mkdir(parents=True, exist_ok=True)
+        lock = safe_path(project, relative.rsplit('/', 1)[0] + '/.session-import-lock')
+        try:
+            lock.mkdir()
+        except FileExistsError:
+            raise CodexInputError('session_metrics_locked') from None
+        try:
+            rows = []
+            if ledger.exists():
+                raw = _read_bounded_file(project, relative, MAX_BYTES)
+                for row in raw.splitlines():
+                    if not row or len(row) > MAX_LINE_BYTES:
+                        raise CodexInputError('invalid_session_ledger')
+                    rows.append(harness_metrics.validate_record(_decode_json(row)))
+                    if len(rows) > MAX_METRIC_ROWS:
+                        raise CodexInputError('session_ledger_over_limit')
+            # Read identity separately, without scanning the body before resume.
+            source = _checked_root(source_root)
+            source_name = _validate_relative_path(session_path)
+            with safe_path(source, source_name).open('rb') as stream:
+                header = _decode_json(stream.readline(MAX_LINE_BYTES + 1))
+            header_payload = header.get('payload') if isinstance(header, dict) else None
+            if not isinstance(header_payload, dict):
+                raise CodexInputError('unsupported_session_header')
+            session_id = header_payload.get('id')
+            source_id = hashlib.sha256(os.path.normcase(str(safe_path(source, source_name))).encode('utf-8')).hexdigest()
+            matching = [row for row in rows if (row.get('usageWindow') or {}).get('sessionId') == session_id
+                        or (row.get('usageWindow') or {}).get('sourceId') == source_id]
+            if any(row['chainId'] != event.get('chainId') for row in matching):
+                raise CodexInputError('session_chain_binding_changed')
+            if len({row['runId'] for row in rows}) != len(rows):
+                raise CodexInputError('duplicate_session_ledger_run')
+            for chain_id in {row['chainId'] for row in matching}:
+                harness_metrics.task_summary(matching, chain_id)
+            checkpoint = matching[-1]['usageWindow'] if matching else None
+            report = summarize_session_usage(source, source_name, checkpoint)
+            if report['usage'] is None:
+                return {'status': 'no-new-usage', 'hasMore': report['hasMore']}
+            run_id = 'session:' + session_id + ':' + str(report['usageWindow']['endOffset'])
+            if any(row['runId'] == run_id for row in rows):
+                raise CodexInputError('duplicate_session_run')
+            measured = {**event, **{key: value for key, value in report['usage'].items() if key != 'totalTokens'},
+                        'runId': run_id, 'usageWindow': report['usageWindow']}
+            record = harness_metrics.normalize_event(measured)
+            harness_metrics.task_summary([*matching, record], event['chainId'])
+            harness_metrics.append_record(ledger, record)
+            return {'status': 'recorded', 'runId': run_id, 'usage': report['usage'],
+                    'hasMore': report['hasMore'], 'acceptance': 'caller-declared-not-inferred'}
+        finally:
+            lock.rmdir()  # Only our own empty cooperating-writer lock.
+    except CodexInputError:
+        raise
+    except (OSError, ValueError, TypeError, DistributionError):
+        raise CodexInputError('session_import_failed') from None
+
+
 def validate_result_shape(value: object) -> None:
     """Validate the fixed result shape only; this never evaluates acceptance."""
     if not isinstance(value, dict) or set(value) != RESULT_KEYS:
@@ -270,7 +465,7 @@ def _budget_reason(
         selected = [row for row in rows if row["chainId"] == chain["chainId"]]
         if not selected:
             return "budget_no_matching_runs"
-        if any(row["schemaVersion"] != harness_metrics.FAILURE_SCHEMA_VERSION for row in selected):
+        if any(row["schemaVersion"] not in (harness_metrics.FAILURE_SCHEMA_VERSION, harness_metrics.SESSION_SCHEMA_VERSION) for row in selected):
             return "budget_legacy_metrics"
         summary = harness_metrics.task_summary(selected, chain["chainId"])
     except (CodexInputError, ValueError, KeyError, TypeError, OSError, DistributionError):
@@ -296,6 +491,15 @@ def _parser() -> argparse.ArgumentParser:
     trace = commands.add_parser("trace-summary")
     trace.add_argument("input")
     trace.add_argument("--root", default=str(PROJECT_ROOT))
+    session = commands.add_parser('session-summary')
+    session.add_argument('input')
+    session.add_argument('--root', required=True)
+    importer = commands.add_parser('session-record')
+    importer.add_argument('input')
+    importer.add_argument('--source-root', required=True)
+    importer.add_argument('--root', default=str(PROJECT_ROOT))
+    importer.add_argument('--event', required=True)
+    importer.add_argument('--metrics', required=True)
     result = commands.add_parser("validate-result")
     result.add_argument("input")
     result.add_argument("--root", default=str(PROJECT_ROOT))
@@ -304,11 +508,15 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    if args.command in {"trace-summary", "validate-result"}:
+    if args.command in {"trace-summary", "validate-result", 'session-summary', 'session-record'}:
         try:
             root = _checked_root(args.root)
             if args.command == "trace-summary":
                 result = summarize_trace(root, args.input)
+            elif args.command == 'session-summary':
+                result = summarize_session_usage(root, args.input)
+            elif args.command == 'session-record':
+                result = record_session_usage(root, args.event, args.metrics, args.source_root, args.input)
             else:
                 raw = _read_bounded_file(root, args.input, MAX_RESULT_BYTES)
                 validate_result_shape(_decode_json(raw))

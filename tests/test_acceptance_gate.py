@@ -176,12 +176,16 @@ class AcceptanceGateTests(unittest.TestCase):
     @patch("acceptance_gate.fingerprint", return_value={"algorithm": "sha256", "value": "fresh", "status": "ok"})
     @patch("acceptance_gate.load")
     def test_non_boolean_passes_never_opens_stored_evidence(self, mocked_load, _):
-        criterion = {"id": "check", "kind": "manual", "passes": "false", "evidence": "saved", "fingerprint": acceptance_gate.fingerprint()}
+        criterion = {"id": "check", "kind": "manual", "passes": True, "evidence": "saved", "fingerprint": acceptance_gate.fingerprint()}
+        criterion["definitionDigest"] = acceptance_gate.criterion_definition_digest(criterion)
         mocked_load.return_value = {"criteria": [criterion]}
-        self.assertEqual((False, "missing stored acceptance evidence"), acceptance_gate.stored_evidence_is_fresh("item", "check"))
-        criterion["passes"] = 1
-        self.assertEqual((False, "missing stored acceptance evidence"), acceptance_gate.stored_evidence_is_fresh("item", "check"))
-        self.assertFalse(acceptance_gate.evaluate(criterion)[0])
+        self.assertEqual((True, "fresh stored acceptance evidence"), acceptance_gate.stored_evidence_is_fresh("item", "check"))
+        self.assertTrue(acceptance_gate.evaluate(criterion)[0])
+        for value in ("false", 1):
+            with self.subTest(passes=value):
+                criterion["passes"] = value
+                self.assertEqual((False, "missing stored acceptance evidence"), acceptance_gate.stored_evidence_is_fresh("item", "check"))
+                self.assertFalse(acceptance_gate.evaluate(criterion)[0])
 
     @patch("acceptance_gate.save")
     @patch("acceptance_gate.fingerprint", return_value={"algorithm": "sha256", "value": "fresh", "status": "ok"})

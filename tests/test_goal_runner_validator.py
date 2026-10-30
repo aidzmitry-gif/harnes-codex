@@ -54,6 +54,16 @@ class GoalPassportValidationTests(unittest.TestCase):
             passport['subgoals'][1].update(model=model, reasoningEffort='ultra')
             self.assert_code(passport, 'SUBGOAL_EFFORT')
 
+    def test_native_metrics_schema_three_preserves_strict_version_validation(self):
+        for version in (1, 2, 3):
+            passport = valid_passport()
+            passport["chain"]["metricsSchemaVersion"] = version
+            self.assertEqual([], validate_passport(passport))
+        for version in (4, True, 1.0, []):
+            passport = valid_passport()
+            passport["chain"]["metricsSchemaVersion"] = version
+            self.assert_code(passport, "CHAIN_CONTINUITY")
+
     def test_root_schema_version_requires_exact_integer(self):
         self.assertEqual([], validate_passport(valid_passport()))
         for version in (True, 1.0):
